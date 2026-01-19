@@ -1,0 +1,46 @@
+# robots.txt for alemancenter
+# Last updated: 2025-09-15
+
+# Sitemaps (absolute URLs)
+Sitemap: https://alemancenter.com/storage/sitemaps/sitemap_articles_jo.xml
+Sitemap: https://alemancenter.com/storage/sitemaps/sitemap_static_jo.xml
+Sitemap: https://alemancenter.com/storage/sitemaps/sitemap_post_jo.xml
+
+# Allow AdSense crawler explicitly
+User-agent: Mediapartners-Google
+Disallow:
+
+# Main rule for all crawlers
+User-agent: *
+Allow: /
+
+# Disallow admin/secure areas, dashboards, and non-public utilities
+Disallow: /dashboard/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /email/
+Disallow: /logout
+Disallow: /upload/
+Disallow: /files/
+Disallow: /messages/
+Disallow: /notifications/
+Disallow: /monitoring/
+Disallow: /security/
+Disallow: /redis/
+Disallow: /chating
+Disallow: /chat/
+Disallow: /app-calendar-events
+Disallow: /download-wait/
+Disallow: /api/
+Disallow: /vb/
+Disallow: /vb/node/
+Disallow: /up/do.php
+Disallow: /up/
+
+# Optional: block low-value or duplicate content sections
+# (only if you are sure these do not contain valuable indexed content)
+Disallow: /forum/
+Disallow: /threads/
+Disallow: /sitemap/

@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan:*)",
+      "Bash(php artisan view:clear:*)",
+      "Bash(timeout:*)",
+      "Bash(findstr:*)",
+      "Bash(ipconfig:*)",
+      "Bash(netsh advfirewall firewall show rule:*)",
+      "Bash(netsh advfirewall firewall add rule name=\"Laravel Development Server\" dir=in action=allow protocol=TCP localport=8000)",
+      "Bash(curl:*)",
+      "Bash(php test_query_speed.php:*)",
+      "Bash(del:*)",
+      "Bash(cd:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run build:*)",
+      "Bash(pkill:*)",
+      "Bash(npm install:*)",
+      "Bash(tee:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

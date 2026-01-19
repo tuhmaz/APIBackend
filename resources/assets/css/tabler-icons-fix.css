@@ -1,0 +1,58 @@
+/* Tabler Icons Fix for Security Dashboard */
+.ti {
+  font-family: 'tabler-icons' !important;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure proper icon display */
+.ti-alert-triangle:before {
+  content: "\f101";
+}
+
+.ti-bell:before {
+  content: "\f102";
+}
+
+.ti-tasks:before {
+  content: "\f103";
+}
+
+.ti-check:before {
+  content: "\f104";
+}
+
+.ti-shield:before {
+  content: "\f105";
+}
+
+.ti-inbox:before {
+  content: "\f106";
+}
+
+.ti-filter:before {
+  content: "\f107";
+}
+
+.ti-refresh:before {
+  content: "\f108";
+}
+
+.ti-minus:before {
+  content: "\f109";
+}
+
+.ti-eye:before {
+  content: "\f10a";
+}
+
+.ti-trash:before {
+  content: "\f10b";
+}
+
+/* Add any additional icons that might be needed */

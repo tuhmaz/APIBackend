@@ -1,0 +1,73 @@
+{
+  "navigation": {
+    "Dashboards": [
+      {
+        "name": "Dashboard Analytics",
+        "icon": "tabler-smart-home",
+        "url": "/dashboard"
+      },
+      {
+        "name": "Dashboard CRM",
+        "icon": "tabler-smart-home",
+        "url": "/dashboard/analytics"
+      }
+    ],
+    "Layouts": [],
+    "Apps": [],
+    "Pages": [],
+    "Front Pages": [],
+    "Components": [],
+    "Forms": [],
+    "Tables": [],
+    "Charts & Maps": [],
+    "files": []
+  },
+  "suggestions": {
+    "Popular Searches": [
+      {
+        "name": "dashboard",
+        "icon": "tabler-smart-home",
+        "url": "dashboard"
+      },
+      {
+        "name": "analytics",
+        "icon": "tabler-vector-bezier-circle",
+        "url": "dashboard/analytics"
+      },
+      {
+        "name": "visitors",
+        "icon": "tabler-smart-home",
+        "url": "dashboard/monitoring/visitors"
+      },
+      {
+        "name": "User List",
+        "icon": "tabler-list-numbers",
+        "url": "dashboard/users"
+      }
+    ],
+    "Apps & Pages": [
+      {
+        "name": "Calendar",
+        "icon": "tabler-calendar",
+        "url": "dashboard/calendar"
+      },
+      {
+        "name": "Files List",
+        "icon": "tabler-list-numbers",
+        "url": "dashboard/files"
+      },
+      {
+        "name": "Account Settings",
+        "icon": "tabler-user",
+        "url": "dashboard/settings"
+      },
+      {
+        "name": "Dialog Examples",
+        "icon": "tabler-square",
+        "url": "modal-examples"
+      }
+    ],
+    "User Interface": [],
+    "Forms & Charts": []
+  }
+}

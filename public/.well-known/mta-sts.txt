@@ -1,0 +1,1 @@
+_mta-sts.alemancenter.com. TXT "v=STSv1; id=20250802"

@@ -1,0 +1,1 @@
+import{t}from"./toastr-DLiKw86X.js";import"./_commonjsHelpers-D6-XlEtG.js";import"./jquery-BQXThELV.js";try{window.toastr=t}catch{}const e={closeButton:!0,progressBar:!0,newestOnTop:!0,preventDuplicates:!0,timeOut:3e3,extendedTimeOut:1500,positionClass:"toast-top-right",showMethod:"fadeIn",hideMethod:"fadeOut"};Object.assign(t.options,e);

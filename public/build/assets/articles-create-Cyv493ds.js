@@ -1,0 +1,1 @@
+import{Q as o}from"./tagify.esm-CeMp8gdw.js";window.addEventListener("DOMContentLoaded",()=>{const e=document.querySelector("#keywords");e&&(e._tagify||new o(e,{delimiters:",",dropdown:{enabled:0},originalInputValueFormat:n=>n.map(t=>t.value).join(",")}))});

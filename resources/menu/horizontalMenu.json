@@ -1,0 +1,350 @@
+{
+  "menu": [
+    {
+      "name": "لوحة التحكم",
+      "icon": "menu-icon icon-base ti tabler-smart-home",
+      "slug": "dashboard.index",
+      "url": "/dashboard",
+      "permissions": "access dashboard"
+    },
+    {
+      "name": "التحليلات",
+      "icon": "menu-icon icon-base ti tabler-chart-dots",
+      "slug": "dashboard.analytics",
+      "url": "/dashboard/analytics",
+      "permissions": "view analytics"
+    },
+    {
+      "menuHeader": "إدارة النظام"
+    },
+    {
+      "name": "إدارة المستخدمين",
+      "icon": "menu-icon icon-base ti tabler-users",
+      "slug": "users",
+      "permissions": "manage users",
+      "submenu": [
+        {
+          "name": "المستخدمين",
+          "icon": "menu-icon icon-base ti tabler-user",
+          "slug": "users.index",
+          "url": "/dashboard/users",
+          "permissions": "manage users"
+        },
+        {
+          "name": "الأدوار",
+          "icon": "menu-icon icon-base ti tabler-shield",
+          "slug": "roles.index",
+          "url": "/dashboard/roles",
+          "permissions": "manage roles"
+        },
+        {
+          "name": "الصلاحيات",
+          "icon": "menu-icon icon-base ti tabler-lock",
+          "slug": "permissions.index",
+          "url": "/dashboard/permissions",
+          "permissions": "manage permissions"
+        }
+      ]
+    },
+    {
+      "menuHeader": "إدارة المقالات"
+    },
+
+    {
+      "name": "المقالات",
+      "icon": "menu-icon icon-base ti tabler-article",
+      "slug": "posts",
+      "permissions": "manage posts",
+      "submenu": [
+        {
+          "name": "جميع المقالات",
+          "icon": "menu-icon icon-base ti tabler-files",
+          "slug": "posts.index",
+          "url": "/dashboard/posts",
+          "permissions": "manage posts"
+        },
+        {
+          "name": "إضافة مقال",
+          "icon": "menu-icon icon-base ti tabler-file-plus",
+          "slug": "posts.create",
+          "url": "/dashboard/posts/create",
+          "permissions": "manage posts"
+        }
+      ]
+    },
+    {
+      "name": "التصنيفات",
+      "icon": "menu-icon icon-base ti tabler-category",
+      "slug": "categories.index",
+      "url": "/dashboard/categories",
+      "permissions": "manage categories"
+    },
+    {
+      "menuHeader": "نظام الصفوف و المحتوى"
+    },
+    {
+      "name": "إدارة الصفوف",
+      "icon": "menu-icon icon-base ti tabler-article",
+      "slug": "articles",
+      "permissions": "manage articles",
+      "submenu": [
+        {
+          "name": "المواد الدراسية",
+          "icon": "menu-icon icon-base ti tabler-book",
+          "slug": "subjects.index",
+          "url": "/dashboard/subjects",
+          "permissions": "manage subjects"
+        },
+        {
+          "name": "الفصول الدراسية",
+          "icon": "menu-icon icon-base ti tabler-calendar",
+          "slug": "semesters.index",
+          "url": "/dashboard/semesters",
+          "permissions": "manage semesters"
+        }
+      ]
+    },
+
+    {
+      "name": "إدارة المحتوى",
+      "icon": "menu-icon icon-base ti tabler-article",
+      "slug": "articles",
+      "permissions": "manage articles",
+      "submenu": [
+        {
+          "name": "جميع المحتوى",
+          "icon": "menu-icon icon-base ti tabler-files",
+          "slug": "articles.index",
+          "url": "/dashboard/articles",
+          "permissions": "manage articles"
+        },
+        {
+          "name": "إضافة محتوى",
+          "icon": "menu-icon icon-base ti tabler-file-plus",
+          "slug": "articles.create",
+          "url": "/dashboard/articles/create",
+          "permissions": "manage articles"
+        }
+      ]
+    },
+    {
+      "menuHeader": "نظام الملفات"
+    },
+    {
+      "name": "الملفات",
+      "icon": "menu-icon icon-base ti tabler-files",
+      "slug": "files.index",
+      "url": "/dashboard/files",
+      "permissions": "manage files"
+    },
+    {
+      "menuHeader": "التواصل"
+    },
+    {
+      "name": "الرسائل",
+      "icon": "menu-icon icon-base ti tabler-messages",
+      "slug": "messages",
+      "badge": ["danger", "جديد"],
+      "permissions": "manage messages",
+      "submenu": [
+        {
+          "name": "صندوق الوارد",
+          "icon": "menu-icon icon-base ti tabler-inbox",
+          "slug": "messages.index",
+          "url": "/dashboard/messages",
+          "permissions": "view messages"
+        }
+      ]
+    },
+    {
+      "menuHeader": "الأمان والمراقبة"
+    },
+    {
+      "name": "Monitoring",
+      "icon": "menu-icon icon-base ti tabler-shield-search",
+      "slug": "monitoring",
+      "permissions": "manage monitoring",
+      "submenu": [
+        {
+          "url": "/dashboard/monitoring/visitors",
+          "name": "Visitors",
+          "icon": "menu-icon icon-base ti tabler-users",
+          "slug": "monitoring.visitors.index",
+          "permissions": "manage monitoring"
+        },
+        {
+          "url": "/dashboard/monitoring/security",
+          "name": "Security Logs",
+          "icon": "menu-icon icon-base ti tabler-shield-lock",
+          "permissions": "manage monitoring",
+          "slug": "monitoring.security.index"
+        },
+        {
+          "url": "/dashboard/monitoring/bans",
+          "name": "IP Bans",
+          "icon": "menu-icon icon-base ti tabler-ban",
+          "permissions": "manage monitoring",
+          "slug": "monitoring.bans.index"
+        }
+      ]
+    },
+    {
+      "name": "الأداء",
+      "icon": "menu-icon icon-base ti tabler-gauge",
+      "slug": "performance.index",
+      "permissions": "manage performance",
+      "submenu": [
+        {
+          "name": "لوحة الأداء",
+          "icon": "menu-icon icon-base ti tabler-dashboard",
+          "slug": "performance.index",
+          "url": "/dashboard/performance",
+          "permissions": "manage performance"
+        },
+        {
+          "name": "المقاييس",
+          "icon": "menu-icon icon-base ti tabler-chart-dots",
+          "slug": "performance.metrics",
+          "url": "/dashboard/performance/metrics",
+          "permissions": "manage performance"
+        }
+      ]
+    },
+    {
+      "name": "Redis",
+      "icon": "menu-icon icon-base ti tabler-database",
+      "slug": "redis",
+      "permissions": "manage redis",
+      "submenu": [
+        {
+          "name": "لوحة التحكم",
+          "icon": "menu-icon icon-base ti tabler-dashboard",
+          "slug": "redis.dashboard",
+          "url": "/dashboard/redis",
+          "permissions": "view redis"
+        },
+        {
+          "name": "لوحة المراقبة",
+          "icon": "menu-icon icon-base ti tabler-dashboard",
+          "slug": "redis.monitoring.dashboard",
+          "url": "/dashboard/redis/monitoring",
+          "permissions": "view redis"
+        },
+        {
+          "name": "env-settings Redis",
+          "icon": "menu-icon icon-base ti tabler-database",
+          "slug": "redis.env-settings",
+          "url": "/dashboard/redis/env-settings",
+          "permissions": "monitor redis"
+        },
+        {
+          "name": "فحص التواصل",
+          "icon": "menu-icon icon-base ti tabler-chart-line",
+          "slug": "redis.test",
+          "url": "/dashboard/redis/test",
+          "permissions": "view redis stats"
+        }
+      ]
+    },
+    {
+      "name": "الأمان",
+      "icon": "menu-icon icon-base ti tabler-shield-lock",
+      "slug": "security",
+      "permissions": "manage security",
+      "submenu": [
+        {
+          "name": "مراقبة",
+          "icon": "menu-icon icon-base ti tabler-list",
+          "slug": "security.index",
+          "url": "/dashboard/security/monitor",
+          "permissions": "view security"
+        },
+        {
+          "name": "لوحة التحكم",
+          "icon": "menu-icon icon-base ti tabler-file-text",
+          "slug": "security",
+          "url": "/dashboard/security",
+          "permissions": "view security"
+        },
+        {
+          "name": "سجلات الأمان",
+          "icon": "menu-icon icon-base ti tabler-file-text",
+          "slug": "security.logs",
+          "url": "/dashboard/security/logs",
+          "permissions": "view security logs"
+        },
+        {
+          "name": "تحليلات الأمان",
+          "icon": "menu-icon icon-base ti tabler-chart-bar",
+          "slug": "security.analytics",
+          "url": "/dashboard/security/analytics",
+          "permissions": "view security analytics"
+        },
+        {
+          "name": "سجلات معدل الطلبات",
+          "icon": "menu-icon icon-base ti tabler-chart-bar",
+          "slug": "security.rate-limit-logs",
+          "url": "/dashboard/security/rate-limit-logs",
+          "permissions": "view security"
+        },
+        {
+          "name": "العناوين المحظورة",
+          "icon": "menu-icon icon-base ti tabler-ban",
+          "slug": "security.blocked-ips",
+          "url": "/dashboard/security/blocked-ips",
+          "permissions": "manage blocked ips"
+        }
+      ]
+    },
+
+    {
+      "menuHeader": "الإعدادات"
+    },
+    {
+      "name": "إعدادات النظام",
+      "icon": "menu-icon icon-base ti tabler-settings",
+      "slug": "settings",
+      "permissions": "manage settings",
+      "submenu": [
+        {
+          "name": "الإعدادات العامة",
+          "icon": "menu-icon icon-base ti tabler-adjustments",
+          "slug": "settings.index",
+          "url": "/dashboard/settings",
+          "permissions": "manage settings"
+        },
+        {
+          "name": "إعدادات OneSignal",
+          "icon": "menu-icon icon-base ti tabler-bell",
+          "slug": "settings.onesignal",
+          "url": "/dashboard/settings/onesignal",
+          "permissions": "manage settings"
+        },
+        {
+          "name": "اختبار SMTP",
+          "icon": "menu-icon icon-base ti tabler-mail",
+          "slug": "settings.test-smtp",
+          "url": "/dashboard/settings/test-smtp",
+          "permissions": "manage settings"
+        }
+      ]
+    },
+    {
+      "name": "التقويم",
+      "icon": "menu-icon icon-base ti tabler-calendar",
+      "slug": "calendar.index",
+      "url": "/dashboard/calendar",
+      "permissions": "manage calendar"
+    },
+    {
+      "menuHeader": "SEO وخريطة الموقع"
+    },
+    {
+      "name": "خريطة الموقع",
+      "icon": "menu-icon icon-base ti tabler-sitemap",
+      "slug": "sitemap.index",
+      "url": "/dashboard/sitemap",
+      "permissions": "manage sitemap"
+    }
+  ]
+}
