@@ -34,7 +34,7 @@ class Cors
             return response('', 200)
                 ->header('Access-Control-Allow-Origin', $allowedOrigin ?: '')
                 ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
-                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, X-API-KEY')
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, X-API-KEY, X-Frontend-Key, X-App-Locale, X-Country-Id, X-Country-Code')
                 ->header('Access-Control-Allow-Credentials', 'true')
                 ->header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
         }
@@ -45,7 +45,7 @@ class Cors
         if ($allowedOrigin) {
             $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, X-API-KEY');
+            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, X-API-KEY, X-Frontend-Key, X-App-Locale, X-Country-Id, X-Country-Code');
             $response->headers->set('Access-Control-Allow-Credentials', 'true');
         }
 

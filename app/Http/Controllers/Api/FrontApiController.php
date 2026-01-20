@@ -15,13 +15,81 @@ use App\Http\Resources\BaseResource;
 class FrontApiController extends Controller
 {
     /**
+     * القائمة البيضاء للإعدادات المسموح بها للعرض العام
+     * فقط هذه الإعدادات سيتم إرجاعها للفرونت إند
+     */
+    protected array $publicSettings = [
+        // معلومات الموقع الأساسية
+        'site_name',
+        'siteName',
+        'site_description',
+        'site_logo',
+        'site_favicon',
+        'site_keywords',
+
+        // معلومات التواصل العامة
+        'contact_email',
+        'contact_phone',
+        'contact_address',
+        'contact_working_hours',
+
+        // روابط السوشيال ميديا
+        'social_facebook',
+        'social_twitter',
+        'social_instagram',
+        'social_youtube',
+        'social_linkedin',
+        'social_tiktok',
+        'social_whatsapp',
+
+        // إعدادات العرض
+        'primary_color',
+        'secondary_color',
+        'footer_text',
+        'copyright_text',
+
+        // إعدادات الإعلانات
+        'google_ads_desktop_classes',
+        'google_ads_mobile_classes',
+        'google_ads_desktop_classes_2',
+        'google_ads_mobile_classes_2',
+        'google_ads_desktop_articles',
+        'google_ads_mobile_articles',
+        'google_ads_desktop_home',
+        'google_ads_mobile_home',
+
+        // إعدادات SEO العامة
+        'meta_title',
+        'meta_description',
+        'meta_keywords',
+        'og_image',
+
+        // إعدادات عامة أخرى
+        'maintenance_mode',
+        'maintenance_message',
+        'allow_registration',
+        'recaptcha_site_key',
+    ];
+
+    /**
      * GET /api/front/settings
+     * إرجاع الإعدادات العامة فقط - بدون أي معلومات حساسة
      */
     public function settings()
     {
-        // Use cache for settings
-        $settings = Cache::remember('front_settings', 600, function () {
-            return Setting::pluck('value', 'key')->toArray();
+        // Use cache for public settings only
+        $settings = Cache::remember('front_public_settings', 600, function () {
+            $allSettings = Setting::pluck('value', 'key')->toArray();
+
+            // فلترة الإعدادات - إرجاع فقط المسموح بها
+            $filteredSettings = [];
+            foreach ($this->publicSettings as $key) {
+                if (isset($allSettings[$key])) {
+                    $filteredSettings[$key] = $allSettings[$key];
+                }
+            }
+
+            return $filteredSettings;
         });
 
         return new BaseResource([

@@ -10,6 +10,7 @@ use App\Services\SmtpTestService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -206,6 +207,10 @@ class SettingsApiController extends Controller
                     Artisan::call('config:clear');
                 })->afterResponse();
             }
+
+            // 8. Clear frontend settings cache
+            Cache::forget('front_settings');
+            Cache::forget('front_public_settings');
 
             return new BaseResource([
                 'message' => 'تم تحديث الإعدادات بنجاح',

@@ -2,11 +2,13 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Middleware\FrontendApiGuard;
 
 // ========== HEALTH CHECK (No database, no middleware) ==========
 Route::get('/ping', function () {
     return response()->json(['status' => 'ok', 'time' => now()->toISOString()]);
 })->withoutMiddleware(['throttle:api']);
+
 use App\Http\Controllers\Api\ActivityApiController;
 use App\Http\Controllers\Api\AnalyticsApiController;
 use App\Http\Controllers\Api\ArticleApiController;
@@ -518,16 +520,21 @@ Route::middleware('auth:sanctum')->prefix('dashboard')->group(function () {
 Route::get('/img/fit/{size}/{path}', [ImageProxyApiController::class, 'fit'])
     ->where('path', '.*');
 
-Route::prefix('front')->group(function () {
-    Route::get('/settings', [FrontApiController::class, 'settings']);
+// ========== PROTECTED PUBLIC API ROUTES ==========
+// These routes are protected by FrontendApiGuard - only accessible from authorized frontends
+Route::middleware([FrontendApiGuard::class])->group(function () {
 
-    // Contact form (visitor → admin)
-    Route::post('/contact', [FrontApiController::class, 'submitContact']);
+    Route::prefix('front')->group(function () {
+        Route::get('/settings', [FrontApiController::class, 'settings']);
 
-    // Members
-    Route::get('/members', [FrontApiController::class, 'members']);
-    Route::get('/members/{id}', [FrontApiController::class, 'showMember']);
-    Route::post('/members/{id}/contact', [FrontApiController::class, 'contactMember']);
+        // Contact form (visitor → admin)
+        Route::post('/contact', [FrontApiController::class, 'submitContact']);
+
+        // Members
+        Route::get('/members', [FrontApiController::class, 'members']);
+        Route::get('/members/{id}', [FrontApiController::class, 'showMember']);
+        Route::post('/members/{id}/contact', [FrontApiController::class, 'contactMember']);
+    });
 });
 
 // Public read-only Articles API (frontend consumption)
