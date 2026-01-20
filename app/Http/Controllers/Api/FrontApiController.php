@@ -8,9 +8,12 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use App\Models\Setting;
+use App\Models\User;
 use App\Mail\ContactFormMail;
 use Carbon\Carbon;
 use App\Http\Resources\BaseResource;
+use App\Http\Resources\Api\UserResource;
+use Spatie\Permission\Models\Role;
 
 class FrontApiController extends Controller
 {

@@ -83,48 +83,68 @@ class FrontendApiGuard
 
     /**
      * التحقق من صحة مصدر الطلب
+     * الطلب يجب أن يأتي من مصدر موثوق (Frontend) وليس من المتصفح مباشرة
      */
     protected function isValidSource(Request $request): bool
     {
-        // 1. التحقق من Origin header
-        $origin = $request->header('Origin');
-        if ($origin && $this->isAllowedOrigin($origin)) {
-            return true;
-        }
-
-        // 2. التحقق من Referer header
-        $referer = $request->header('Referer');
-        if ($referer && $this->isAllowedReferer($referer)) {
-            return true;
-        }
-
-        // 3. التحقق من X-Requested-With (AJAX requests)
-        $xRequestedWith = $request->header('X-Requested-With');
-        if ($xRequestedWith === 'XMLHttpRequest') {
-            // AJAX request - تحقق إضافي من الـ Host
-            $host = $request->header('Host');
-            if ($host && $this->isAllowedHost($host)) {
-                return true;
-            }
-        }
-
-        // 4. التحقق من الـ API Key الخاص بالفرونت إند
-        $apiKey = $request->header('X-Frontend-Key') ?? $request->header('X-API-KEY');
+        // 1. التحقق من الـ API Key الخاص بالفرونت إند (الأكثر أماناً)
+        $apiKey = $request->header('X-Frontend-Key');
         if ($apiKey && $this->isValidFrontendKey($apiKey)) {
             return true;
         }
 
-        // 5. السماح للطلبات المصادق عليها (auth:sanctum)
+        // 2. التحقق من Origin header (للطلبات من Frontend)
+        $origin = $request->header('Origin');
+        if ($origin && $this->isAllowedOrigin($origin)) {
+            // Origin موجود وصالح - هذا طلب CORS من Frontend
+            return true;
+        }
+
+        // 3. التحقق من Referer header مع X-Requested-With
+        $referer = $request->header('Referer');
+        $xRequestedWith = $request->header('X-Requested-With');
+        if ($referer && $this->isAllowedReferer($referer) && $xRequestedWith === 'XMLHttpRequest') {
+            return true;
+        }
+
+        // 4. السماح للطلبات المصادق عليها (auth:sanctum)
         if ($request->bearerToken() && $request->user()) {
             return true;
         }
 
-        // في بيئة التطوير، السماح بمرونة أكبر
-        if (app()->environment('local', 'development')) {
-            // السماح إذا كان الطلب من localhost
+        // 5. في بيئة التطوير المحلية فقط، السماح بمرونة أكبر
+        if (app()->environment('local')) {
             $ip = $request->ip();
-            if (in_array($ip, ['127.0.0.1', '::1', 'localhost'])) {
+            // السماح فقط من localhost مع X-Requested-With header
+            if (in_array($ip, ['127.0.0.1', '::1']) && $xRequestedWith === 'XMLHttpRequest') {
                 return true;
+            }
+        }
+
+        // 6. الطلبات من Server-Side (Next.js SSR) - تحقق من الـ User-Agent
+        $userAgent = $request->userAgent();
+        if ($userAgent && $this->isServerSideRequest($userAgent, $request)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * التحقق من طلبات Server-Side Rendering
+     */
+    protected function isServerSideRequest(string $userAgent, Request $request): bool
+    {
+        // Next.js و Node.js server-side requests
+        $serverAgents = ['node-fetch', 'undici', 'Next.js'];
+
+        foreach ($serverAgents as $agent) {
+            if (stripos($userAgent, $agent) !== false) {
+                // تحقق إضافي - يجب أن يحتوي على API Key
+                $apiKey = $request->header('X-Frontend-Key');
+                if ($apiKey && $this->isValidFrontendKey($apiKey)) {
+                    return true;
+                }
             }
         }
 
