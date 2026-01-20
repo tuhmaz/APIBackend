@@ -26,8 +26,9 @@ class FilterApiController extends Controller
         }
 
         $categoryMap = [
-            'study_plan' => ['study_plan', 'plans', 'study-plan'],
-            'plans' => ['study_plan', 'plans', 'study-plan'],
+            'plan' => ['study_plan', 'plans', 'study-plan', 'plan'],
+            'study_plan' => ['study_plan', 'plans', 'study-plan', 'plan'],
+            'plans' => ['study_plan', 'plans', 'study-plan', 'plan'],
             'worksheet' => ['worksheet', 'papers', 'worksheets'],
             'papers' => ['worksheet', 'papers', 'worksheets'],
             'exam' => ['exam', 'tests', 'exams', 'test'],
@@ -99,6 +100,10 @@ class FilterApiController extends Controller
                 });
             }
 
+            if ($search = $request->input('q')) {
+                $articleQuery->where('title', 'like', '%' . $search . '%');
+            }
+
             return $articleQuery
                 ->with(['subject', 'semester', 'schoolClass', 'files'])
                 ->latest('id')
@@ -128,7 +133,9 @@ class FilterApiController extends Controller
                             $q->where('semester_id', $request->semester_id);
                         }
                         if ($request->class_id) {
-                            $q->where('grade_level', $request->class_id);
+                            $q->whereHas('semester', function ($qq) use ($request) {
+                                $qq->where('grade_level', $request->class_id);
+                            });
                         }
                         if ($request->subject_id) {
                             $q->where('subject_id', $request->subject_id);

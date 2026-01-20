@@ -96,6 +96,29 @@ class ArticleApiController extends Controller
         };
     }
 
+    private function resolveFileCategories(?string $category): array
+    {
+        if (!$category) {
+            return [];
+        }
+
+        $categoryMap = [
+            'plan' => ['study_plan', 'plans', 'study-plan', 'plan'],
+            'study_plan' => ['study_plan', 'plans', 'study-plan', 'plan'],
+            'plans' => ['study_plan', 'plans', 'study-plan', 'plan'],
+            'worksheet' => ['worksheet', 'papers', 'worksheets'],
+            'papers' => ['worksheet', 'papers', 'worksheets'],
+            'exam' => ['exam', 'tests', 'exams', 'test'],
+            'tests' => ['exam', 'tests', 'exams', 'test'],
+            'book' => ['book', 'books'],
+            'books' => ['book', 'books'],
+            'record' => ['record', 'records'],
+            'records' => ['record', 'records'],
+        ];
+
+        return $categoryMap[$category] ?? [$category];
+    }
+
     private function forgetArticleCache(string $database, int $articleId, ?int $previousSubjectId = null, ?int $currentSubjectId = null): void
     {
         Cache::forget("article_{$database}_{$articleId}");
@@ -175,7 +198,7 @@ class ArticleApiController extends Controller
 
         $query = Article::on($connection)
             ->with(['schoolClass', 'subject', 'semester', 'keywords', 'files'])
-            ->orderByDesc('created_at');
+            ->latest('id');
 
         // يمكن إضافة فلاتر اختيارية مثلاً بالعنوان أو المادة لاحقاً
         if ($search = $request->input('q')) {
@@ -191,23 +214,17 @@ class ArticleApiController extends Controller
         }
 
         if ($classId = $request->input('class_id')) {
-             // Assuming grade_level is the foreign key for SchoolClass in Article model, 
-             // OR there is a school_class_id column. 
-             // Looking at Article model, it has 'grade_level' in fillable.
-             // But ArticleResource likely maps it.
-             // Let's check Article model relationships again.
-             // Article model says: public function schoolClass() { ... }
-             // I'll assume the column is 'grade_level' based on fillable, 
-             // but usually it's school_class_id.
-             // Let's check Article model relationship definition.
-             $query->whereHas('schoolClass', function($q) use ($classId) {
-                 $q->where('id', $classId);
-             });
+            // استخدام منطق الفلتر القديم كما في FilterController
+            // الاعتماد على علاقة الفصل الدراسي للحصول على الصف
+            $query->whereHas('semester', function($q) use ($classId) {
+                $q->where('grade_level', $classId);
+            });
         }
 
         if ($category = $request->input('file_category')) {
-            $query->whereHas('files', function ($q) use ($category) {
-                $q->where('file_category', $category);
+            $fileCategories = $this->resolveFileCategories($category);
+            $query->whereHas('files', function ($q) use ($fileCategories) {
+                $q->whereIn('file_category', $fileCategories);
             });
         }
 
