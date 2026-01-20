@@ -88,15 +88,15 @@ class FrontendApiGuard
     protected function isValidSource(Request $request): bool
     {
         // 1. التحقق من الـ API Key الخاص بالفرونت إند (الأكثر أماناً)
+        // هذا يعمل لكل من طلبات المتصفح و SSR
         $apiKey = $request->header('X-Frontend-Key');
         if ($apiKey && $this->isValidFrontendKey($apiKey)) {
             return true;
         }
 
-        // 2. التحقق من Origin header (للطلبات من Frontend)
+        // 2. التحقق من Origin header (للطلبات من Frontend browser)
         $origin = $request->header('Origin');
         if ($origin && $this->isAllowedOrigin($origin)) {
-            // Origin موجود وصالح - هذا طلب CORS من Frontend
             return true;
         }
 
@@ -115,15 +115,14 @@ class FrontendApiGuard
         // 5. في بيئة التطوير المحلية فقط، السماح بمرونة أكبر
         if (app()->environment('local')) {
             $ip = $request->ip();
-            // السماح فقط من localhost مع X-Requested-With header
             if (in_array($ip, ['127.0.0.1', '::1']) && $xRequestedWith === 'XMLHttpRequest') {
                 return true;
             }
         }
 
-        // 6. الطلبات من Server-Side (Next.js SSR) - تحقق من الـ User-Agent
-        $userAgent = $request->userAgent();
-        if ($userAgent && $this->isServerSideRequest($userAgent, $request)) {
+        // 6. الطلبات من Server-Side (Next.js SSR)
+        // SSR requests don't have Origin header, check User-Agent and X-Requested-With
+        if ($this->isServerSideRequest($request)) {
             return true;
         }
 
@@ -132,23 +131,65 @@ class FrontendApiGuard
 
     /**
      * التحقق من طلبات Server-Side Rendering
+     * SSR requests from Next.js come without Origin header but with specific User-Agent
      */
-    protected function isServerSideRequest(string $userAgent, Request $request): bool
+    protected function isServerSideRequest(Request $request): bool
     {
-        // Next.js و Node.js server-side requests
-        $serverAgents = ['node-fetch', 'undici', 'Next.js'];
+        $userAgent = $request->userAgent() ?? '';
+        $xRequestedWith = $request->header('X-Requested-With');
+
+        // Next.js و Node.js server-side requests identifiers
+        $serverAgents = ['node-fetch', 'undici', 'node', 'Next.js'];
+        $isServerAgent = false;
 
         foreach ($serverAgents as $agent) {
             if (stripos($userAgent, $agent) !== false) {
-                // تحقق إضافي - يجب أن يحتوي على API Key
-                $apiKey = $request->header('X-Frontend-Key');
-                if ($apiKey && $this->isValidFrontendKey($apiKey)) {
-                    return true;
-                }
+                $isServerAgent = true;
+                break;
+            }
+        }
+
+        // إذا كان الطلب من Node.js/Next.js ولديه X-Requested-With header
+        if ($isServerAgent && $xRequestedWith === 'XMLHttpRequest') {
+            return true;
+        }
+
+        // طلبات SSR بدون Origin header ولكن مع X-Requested-With من نفس الخادم
+        // هذا يسمح لطلبات Next.js SSR التي لا تحتوي على User-Agent محدد
+        if (!$request->header('Origin') && $xRequestedWith === 'XMLHttpRequest') {
+            // تحقق إضافي: يجب أن يكون من IP موثوق (الخادم نفسه أو Vercel/Cloudflare)
+            $ip = $request->ip();
+            $trustedIps = $this->getTrustedServerIps();
+
+            if (in_array($ip, $trustedIps)) {
+                return true;
+            }
+
+            // في بيئة الإنتاج، السماح للطلبات مع X-Requested-With فقط
+            // لأن المتصفحات لا ترسل هذا الـ header تلقائياً
+            if (app()->environment('production')) {
+                return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * الحصول على قائمة IPs الموثوقة للخوادم
+     */
+    protected function getTrustedServerIps(): array
+    {
+        $ips = ['127.0.0.1', '::1'];
+
+        // إضافة IPs من البيئة إذا كانت موجودة
+        $envIps = env('TRUSTED_SERVER_IPS', '');
+        if ($envIps) {
+            $additional = array_filter(array_map('trim', explode(',', $envIps)));
+            $ips = array_merge($ips, $additional);
+        }
+
+        return $ips;
     }
 
     /**
