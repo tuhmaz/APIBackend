@@ -91,11 +91,6 @@ class Post extends Model
         return $this->hasMany(File::class, 'post_id');
     }
 
-    public function shares(): HasMany
-    {
-        return $this->hasMany(PostShare::class, 'post_id');
-    }
-
     public function getKeywordsArrayAttribute()
     {
         return $this->keywords instanceof \Illuminate\Database\Eloquent\Collection

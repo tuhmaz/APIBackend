@@ -28,7 +28,6 @@ use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PerformanceApiController;
 use App\Http\Controllers\Api\PermissionApiController;
 use App\Http\Controllers\Api\PostApiController;
-use App\Http\Controllers\Api\PostShareController;
 use App\Http\Controllers\Api\ReactionApiController;
 use App\Http\Controllers\Api\RedisApiController;
 use App\Http\Controllers\Api\RoleApiController;
@@ -131,7 +130,6 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
     Route::get('/posts', [PostApiController::class, 'index']);
     Route::get('/posts/{id}', [PostApiController::class, 'show']);
     Route::post('/posts/{id}/increment-view', [PostApiController::class, 'incrementView']);
-    Route::get('/posts/{id}/shares', [PostShareController::class, 'index']);
 
     // Comments
     Route::get('/comments/{database}', [CommentApiController::class, 'index']);
@@ -182,9 +180,6 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
         Route::post('/reactions', [ReactionApiController::class, 'store']);
         Route::delete('/reactions/{comment_id}', [ReactionApiController::class, 'destroy']);
         Route::get('/reactions/{comment_id}', [ReactionApiController::class, 'show']);
-
-        // Post Shares
-        Route::post('/posts/{id}/share', [PostShareController::class, 'store']);
 
         // Roles (top-level)
         Route::get('/roles', [RoleApiController::class, 'index']);
