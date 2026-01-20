@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PerformanceApiController;
 use App\Http\Controllers\Api\PermissionApiController;
 use App\Http\Controllers\Api\PostApiController;
+use App\Http\Controllers\Api\PostShareController;
 use App\Http\Controllers\Api\ReactionApiController;
 use App\Http\Controllers\Api\RedisApiController;
 use App\Http\Controllers\Api\RoleApiController;
@@ -54,6 +55,8 @@ Route::get('/ping', function () {
 // These MUST be accessible without frontend protection
 // ========================================================================
 Route::prefix('auth')->group(function () {
+    Route::get('/google/redirect', [AuthApiController::class, 'googleRedirect']);
+
     // Google OAuth callback (redirected from Google)
     Route::get('/google/callback', [AuthApiController::class, 'googleCallback']);
 
@@ -89,9 +92,6 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
         // Password Reset
         Route::post('/password/forgot', [AuthApiController::class, 'forgotPassword']);
         Route::post('/password/reset', [AuthApiController::class, 'resetPassword']);
-
-        // Google OAuth redirect
-        Route::get('/google/redirect', [AuthApiController::class, 'googleRedirect']);
 
         // Authenticated routes
         Route::middleware('auth:sanctum')->group(function () {
@@ -131,6 +131,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
     Route::get('/posts', [PostApiController::class, 'index']);
     Route::get('/posts/{id}', [PostApiController::class, 'show']);
     Route::post('/posts/{id}/increment-view', [PostApiController::class, 'incrementView']);
+    Route::get('/posts/{id}/shares', [PostShareController::class, 'index']);
 
     // Comments
     Route::get('/comments/{database}', [CommentApiController::class, 'index']);
@@ -181,6 +182,9 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
         Route::post('/reactions', [ReactionApiController::class, 'store']);
         Route::delete('/reactions/{comment_id}', [ReactionApiController::class, 'destroy']);
         Route::get('/reactions/{comment_id}', [ReactionApiController::class, 'show']);
+
+        // Post Shares
+        Route::post('/posts/{id}/share', [PostShareController::class, 'store']);
 
         // Roles (top-level)
         Route::get('/roles', [RoleApiController::class, 'index']);
