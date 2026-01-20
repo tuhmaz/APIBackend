@@ -25,10 +25,12 @@ class MessageNotification extends Notification
 
     public function toArray($notifiable)
     {
+        $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
+
         return [
             'title' => 'New Message from ' . $this->message->sender->name,
             'message_id' => $this->message->id,
-            'url' => route('dashboard.messages.show', $this->message->id),
+            'url' => $frontendUrl . '/dashboard/messages?message=' . $this->message->id,
         ];
     }
 }

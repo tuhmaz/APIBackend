@@ -27,7 +27,7 @@ class PruneNotifications extends Command
 
         $total = 0;
         do {
-            $query = DB::table('notifications')->where('created_at', '<', $threshold);
+            $query = DB::connection('jo')->table('notifications')->where('created_at', '<', $threshold);
             if (!$deleteUnread) {
                 $query->whereNotNull('read_at');
             }

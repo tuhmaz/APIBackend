@@ -20,10 +20,8 @@ storage/logs/*
 
 # Environment files
 .env
-.env.backup
-.env.production
-.env.test
-.env.example
+.env.*
+!.env.example
 
 # PHPUnit
 .phpunit.result.cache
@@ -58,3 +56,6 @@ frontend/out/
 frontend/build/
 frontend/dist/
 frontend/.vercel/
+
+# Backups
+*.bak

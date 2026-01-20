@@ -79,22 +79,28 @@ class SchoolClassApiController extends Controller
         $countryId = $request->query('country_id', '1');
         $connection = $this->connection($countryId);
 
-        // Use cache for individual school class
-        $cacheKey = "school_class_{$connection}_{$id}";
-        $schoolClass = $this->remember($cacheKey, 600, function () use ($connection, $id) {
+        // Get cache version for invalidation (set when articles are created/updated)
+        $cacheVersion = Cache::get("filter_cache_version_{$connection}", 0);
+
+        // Use cache with version - 60 seconds TTL for fresher data
+        $cacheKey = "school_class_{$connection}_{$id}_v{$cacheVersion}";
+        $schoolClass = $this->remember($cacheKey, 60, function () use ($connection, $id) {
             return SchoolClass::on($connection)
                 ->with(['subjects' => function ($query) {
-                    $query->withCount(['articles', 'files']);
+                    // Count only published articles
+                    $query->withCount([
+                        'articles' => function ($q) {
+                            $q->where('status', 1);
+                        },
+                        'files' => function ($q) {
+                            $q->whereHas('article', function ($aq) {
+                                $aq->where('status', 1);
+                            });
+                        }
+                    ]);
                 }, 'semesters'])
                 ->findOrFail($id);
         });
-
-        $schoolClass->loadMissing([
-            'subjects' => function ($query) {
-                $query->withCount(['articles', 'files']);
-            },
-            'semesters',
-        ]);
 
         return new SchoolClassResource($schoolClass);
     }

@@ -120,16 +120,13 @@ class AuthApiController extends Controller
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        // Cache user roles and permissions for 60 seconds
-        $cacheKey = "user_with_roles_{$user->id}";
-        $userData = Cache::remember($cacheKey, 60, function () use ($user) {
-            $user->load(['roles', 'permissions']);
-            return $user;
-        });
+        // Load roles and permissions with caching at query level
+        // Using eager loading with select for better performance
+        $user->load(['roles:id,name', 'permissions:id,name']);
 
         return new BaseResource([
             'status' => true,
-            'user'   => new UserResource($userData)
+            'user'   => new UserResource($user)
         ]);
     }
 
@@ -322,16 +319,41 @@ class AuthApiController extends Controller
      *  GOOGLE LOGIN
      * ============================
      */
-    public function googleRedirect()
+
+    /**
+     * Redirect to Google OAuth
+     * For SPA: Returns the redirect URL instead of redirecting
+     */
+    public function googleRedirect(Request $request)
     {
-        return Socialite::driver('google')->redirect();
+        // For SPA, return the redirect URL as JSON
+        if ($request->wantsJson() || $request->has('spa')) {
+            $redirectUrl = Socialite::driver('google')
+                ->stateless()
+                ->redirect()
+                ->getTargetUrl();
+
+            return new BaseResource([
+                'status' => true,
+                'redirect_url' => $redirectUrl,
+            ]);
+        }
+
+        // For traditional web, do the redirect
+        return Socialite::driver('google')->stateless()->redirect();
     }
 
-    public function googleCallback()
+    /**
+     * Handle Google OAuth callback
+     * Supports both code exchange and direct callback
+     */
+    public function googleCallback(Request $request)
     {
         try {
-            $googleUser = Socialite::driver('google')->user();
+            // Get user from Google using the authorization code
+            $googleUser = Socialite::driver('google')->stateless()->user();
 
+            // Find or create user
             $user = User::where('email', $googleUser->email)->first();
 
             if (!$user) {
@@ -341,24 +363,55 @@ class AuthApiController extends Controller
                     'password'          => Hash::make(Str::random(24)),
                     'google_id'         => $googleUser->id,
                     'email_verified_at' => now(),
+                    'profile_photo_path' => $googleUser->avatar,
                 ]);
 
                 $user->assignRole('User');
+            } else {
+                // Update google_id if not set
+                if (!$user->google_id) {
+                    $user->google_id = $googleUser->id;
+                    $user->save();
+                }
             }
+
+            // Load roles and permissions
+            $user->load(['roles:id,name', 'permissions:id,name']);
 
             $token = $this->issueToken($user);
 
-            return new BaseResource([
-                'status' => true,
-                'token'  => $token,
-                'user'   => new UserResource($user)
-            ]);
+            // Check if this is a popup/SPA request
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+
+            // For SPA popup flow, redirect with token in URL
+            if ($request->has('state') || $request->wantsJson()) {
+                // Return JSON for API calls
+                if ($request->wantsJson()) {
+                    return new BaseResource([
+                        'status' => true,
+                        'token'  => $token,
+                        'user'   => new UserResource($user)
+                    ]);
+                }
+            }
+
+            // Redirect to frontend with token
+            return redirect()->to("{$frontendUrl}/auth/google/callback?token={$token}");
 
         } catch (\Exception $e) {
-            Log::error("Google Login Failed: {$e->getMessage()}");
+            Log::error("Google Login Failed: {$e->getMessage()}", [
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+
+            // Redirect to frontend with error
+            if (!request()->wantsJson()) {
+                return redirect()->to("{$frontendUrl}/login?error=google_auth_failed");
+            }
 
             return (new BaseResource(['message' => 'فشل تسجيل الدخول باستخدام Google.']))
-                ->response(request())
+                ->response($request)
                 ->setStatusCode(500);
         }
     }

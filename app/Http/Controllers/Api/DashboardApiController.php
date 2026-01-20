@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Comment;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Resources\BaseResource;
@@ -21,55 +22,64 @@ class DashboardApiController extends Controller
      */
     public function index()
     {
-        // Aggregate stats
-        $totalArticles = Article::count();
-        $totalNews = News::count();
-        $totalUsers = User::count();
+        // Cache totals for 60 seconds
+        $totals = Cache::remember('dashboard_totals', 60, function () {
+            return [
+                'articles' => Article::count(),
+                'news'     => News::count(),
+                'users'    => User::count(),
+            ];
+        });
 
-        // Who is online?
-        $onlineWindow = now()->subMinutes(5);
+        // Online users - cache for 30 seconds
+        $onlineData = Cache::remember('dashboard_online_users', 30, function () {
+            $onlineWindow = now()->subMinutes(5);
 
-        $onlineUsersCount = User::where(function($q) use ($onlineWindow) {
-            $q->where('last_activity', '>=', $onlineWindow)
-              ->orWhere('last_seen', '>=', $onlineWindow);
-        })->count();
-
-        // Trends
-        $articlesTrend = $this->calculateTrend(Article::class);
-        $newsTrend     = $this->calculateTrend(News::class);
-        $usersTrend    = $this->calculateTrend(User::class);
-
-        // Analytics (last 7 days)
-        $analyticsData = $this->getContentAnalytics(7);
-
-        // Last 5 online users
-        $onlineUsers = User::where(function($q) use ($onlineWindow) {
+            $count = User::where(function($q) use ($onlineWindow) {
                 $q->where('last_activity', '>=', $onlineWindow)
                   ->orWhere('last_seen', '>=', $onlineWindow);
-            })
-            ->select('id','name','profile_photo_path','last_activity','last_seen')
-            ->limit(5)
-            ->get()
-            ->map(function ($user){
-                $lastActivity = $user->last_activity ?? $user->last_seen;
-                $user->status = $this->getUserStatus($lastActivity);
-                return $user;
-            });
+            })->count();
 
-        $recentActivities = $this->getRecentActivities();
+            $users = User::where(function($q) use ($onlineWindow) {
+                    $q->where('last_activity', '>=', $onlineWindow)
+                      ->orWhere('last_seen', '>=', $onlineWindow);
+                })
+                ->select('id','name','profile_photo_path','last_activity','last_seen')
+                ->limit(5)
+                ->get();
+
+            return ['count' => $count, 'users' => $users];
+        });
+
+        // Process online users status
+        $onlineUsers = $onlineData['users']->map(function ($user) {
+            $lastActivity = $user->last_activity ?? $user->last_seen;
+            $user->status = $this->getUserStatus($lastActivity);
+            return $user;
+        });
+
+        // Cache trends for 5 minutes (they don't change often)
+        $trends = Cache::remember('dashboard_trends', 300, function () {
+            return [
+                'articles' => $this->calculateTrend(Article::class),
+                'news'     => $this->calculateTrend(News::class),
+                'users'    => $this->calculateTrend(User::class),
+            ];
+        });
+
+        // Cache analytics for 2 minutes
+        $analyticsData = Cache::remember('dashboard_analytics_7', 120, function () {
+            return $this->getContentAnalytics(7);
+        });
+
+        // Cache recent activities for 30 seconds
+        $recentActivities = Cache::remember('dashboard_recent_activities', 30, function () {
+            return $this->getRecentActivities();
+        });
 
         return new BaseResource([
-            'totals' => [
-                'articles' => $totalArticles,
-                'news'     => $totalNews,
-                'users'    => $totalUsers,
-                'online_users' => $onlineUsersCount,
-            ],
-            'trends' => [
-                'articles' => $articlesTrend,
-                'news'     => $newsTrend,
-                'users'    => $usersTrend,
-            ],
+            'totals' => array_merge($totals, ['online_users' => $onlineData['count']]),
+            'trends' => $trends,
             'analytics' => $analyticsData,
             'onlineUsers' => $onlineUsers,
             'recentActivities' => $recentActivities,
@@ -81,9 +91,12 @@ class DashboardApiController extends Controller
      */
     public function analytics(Request $request)
     {
-        $days = $request->input('days', 7);
+        $days = min((int) $request->input('days', 7), 30); // Max 30 days
 
-        $analyticsData = $this->getContentAnalytics($days);
+        // Cache analytics based on days parameter
+        $analyticsData = Cache::remember("dashboard_analytics_{$days}", 120, function () use ($days) {
+            return $this->getContentAnalytics($days);
+        });
 
         return new BaseResource($analyticsData);
     }
