@@ -3,44 +3,38 @@
 namespace App\Observers;
 
 use App\Models\Article;
-use App\Services\SitemapService;
+use App\Jobs\GenerateSitemapJob;
 
 class ArticleObserver
 {
-    protected $sitemapService;
-
-    public function __construct(SitemapService $sitemapService)
-    {
-        $this->sitemapService = $sitemapService;
-    }
-
     /**
      * Handle the Article "created" event.
-     * Sitemap regeneration disabled for performance - use manual regeneration from dashboard
      */
-    public function created(Article $article)
+    public function created(Article $article): void
     {
-        // Disabled: Sitemap regeneration moved to manual process via dashboard
-        // $this->sitemapService->generateArticlesSitemap($article->getConnectionName());
+        // Dispatch with delay to batch multiple changes
+        GenerateSitemapJob::dispatch($article->getConnectionName(), 'articles')
+            ->delay(now()->addMinutes(2));
     }
 
     /**
      * Handle the Article "updated" event.
-     * Sitemap regeneration disabled for performance - use manual regeneration from dashboard
      */
-    public function updated(Article $article)
+    public function updated(Article $article): void
     {
-        // Disabled: Sitemap regeneration moved to manual process via dashboard
-        // $this->sitemapService->generateArticlesSitemap($article->getConnectionName());
+        // Only regenerate sitemap if relevant fields changed
+        if ($article->wasChanged(['title', 'status', 'slug', 'image_url', 'updated_at'])) {
+            GenerateSitemapJob::dispatch($article->getConnectionName(), 'articles')
+                ->delay(now()->addMinutes(2));
+        }
     }
 
     /**
      * Handle the Article "deleted" event.
-     * Sitemap regeneration disabled for performance - use manual regeneration from dashboard
      */
-    public function deleted(Article $article)
+    public function deleted(Article $article): void
     {
-        // Disabled: Sitemap regeneration moved to manual process via dashboard
-        // $this->sitemapService->generateArticlesSitemap($article->getConnectionName());
+        GenerateSitemapJob::dispatch($article->getConnectionName(), 'articles')
+            ->delay(now()->addMinutes(2));
     }
 }

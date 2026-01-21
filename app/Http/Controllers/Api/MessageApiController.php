@@ -179,7 +179,11 @@ class MessageApiController extends Controller
     {
         $message = Message::findOrFail($id);
 
-        if ($message->sender_id !== Auth::id()) {
+        // Check if user is the sender or a participant in the conversation
+        $isSender = $message->sender_id == Auth::id();
+        $isParticipant = $message->conversation && $message->conversation->hasUser(Auth::id());
+
+        if (!$isSender && !$isParticipant) {
             return (new BaseResource(['message' => 'Unauthorized']))
                 ->response(request())
                 ->setStatusCode(403);
@@ -199,7 +203,10 @@ class MessageApiController extends Controller
             ->where('id', $id)
             ->firstOrFail();
 
-        if (!$message->conversation->hasUser(Auth::id())) {
+        $isSender = $message->sender_id == Auth::id();
+        $isParticipant = $message->conversation && $message->conversation->hasUser(Auth::id());
+
+        if (!$isSender && !$isParticipant) {
             return (new BaseResource(['message' => 'Unauthorized']))
                 ->response(request())
                 ->setStatusCode(403);

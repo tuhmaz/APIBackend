@@ -3,41 +3,38 @@
 namespace App\Observers;
 
 use App\Models\News;
-use App\Services\SitemapService;
+use App\Jobs\GenerateSitemapJob;
 
 class NewsObserver
 {
-    protected $sitemapService;
-
-    public function __construct(SitemapService $sitemapService)
-    {
-        $this->sitemapService = $sitemapService;
-    }
-
     /**
      * Handle the News "created" event.
-     * Disabled for performance - use manual sitemap regeneration
      */
-    public function created(News $news)
+    public function created(News $news): void
     {
-        // Disabled for performance
+        // Dispatch with delay to batch multiple changes
+        GenerateSitemapJob::dispatch($news->getConnectionName(), 'news')
+            ->delay(now()->addMinutes(2));
     }
 
     /**
      * Handle the News "updated" event.
-     * Disabled for performance - use manual sitemap regeneration
      */
-    public function updated(News $news)
+    public function updated(News $news): void
     {
-        // Disabled for performance
+        // Only regenerate sitemap if relevant fields changed
+        if ($news->wasChanged(['title', 'status', 'slug', 'image_url', 'updated_at'])) {
+            GenerateSitemapJob::dispatch($news->getConnectionName(), 'news')
+                ->delay(now()->addMinutes(2));
+        }
     }
 
     /**
      * Handle the News "deleted" event.
-     * Disabled for performance - use manual sitemap regeneration
      */
-    public function deleted(News $news)
+    public function deleted(News $news): void
     {
-        // Disabled for performance
+        GenerateSitemapJob::dispatch($news->getConnectionName(), 'news')
+            ->delay(now()->addMinutes(2));
     }
 }
