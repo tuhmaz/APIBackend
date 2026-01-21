@@ -10,6 +10,7 @@ use Intervention\Image\Laravel\Facades\Image;
 use Illuminate\Support\Facades\Log;
 use App\Services\ImageOptimizationService;
 use App\Http\Resources\BaseResource;
+use App\Models\File;
 
 class ImageUploadApiController extends Controller
 {
@@ -18,6 +19,56 @@ class ImageUploadApiController extends Controller
     public function __construct(ImageOptimizationService $imageOptimizer)
     {
         $this->imageOptimizer = $imageOptimizer;
+    }
+
+    /**
+     * Get database connection based on country code
+     */
+    private function getConnection(string $country): string
+    {
+        return match ($country) {
+            '2' => 'sa',
+            '3' => 'eg',
+            '4' => 'ps',
+            default => 'jo',
+        };
+    }
+
+    /**
+     * Save image record to files table
+     */
+    private function saveFileRecord(string $path, int $width, int $height, string $country = '1'): ?File
+    {
+        try {
+            $connection = $this->getConnection($country);
+            $fullPath = Storage::disk('public')->path($path);
+            $fileSize = file_exists($fullPath) ? filesize($fullPath) : 0;
+            $extension = pathinfo($path, PATHINFO_EXTENSION);
+            $filename = basename($path);
+
+            $mimeTypes = [
+                'jpg' => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'png' => 'image/png',
+                'gif' => 'image/gif',
+                'webp' => 'image/webp',
+                'bmp' => 'image/bmp',
+                'tiff' => 'image/tiff',
+            ];
+            $mimeType = $mimeTypes[strtolower($extension)] ?? 'image/' . $extension;
+
+            return File::on($connection)->create([
+                'file_path' => $path,
+                'file_name' => $filename,
+                'file_type' => $extension,
+                'file_category' => 'images',
+                'file_size' => $fileSize,
+                'mime_type' => $mimeType,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to save file record', ['error' => $e->getMessage(), 'path' => $path]);
+            return null;
+        }
     }
 
     /**
@@ -54,6 +105,9 @@ class ImageUploadApiController extends Controller
                 'convert_to_webp' => $request->boolean('convert_to_webp', true),
             ];
 
+            // Get country from request for database connection
+            $country = $request->input('country', '1');
+
             /**
              * Responsive Versions
              */
@@ -77,12 +131,16 @@ class ImageUploadApiController extends Controller
 
                 $img = Image::read(Storage::disk('public')->get($main));
 
+                // Save main image record to files table
+                $fileRecord = $this->saveFileRecord($main, $img->width(), $img->height(), $country);
+
                 return (new BaseResource([
                     'url' => Storage::url($main),
                     'width' => $img->width(),
                     'height' => $img->height(),
                     'responsive_urls' => $urls,
                     'optimized' => true,
+                    'file_id' => $fileRecord?->id,
                 ]))->response($request)->setStatusCode(200);
 
             } else {
@@ -97,11 +155,15 @@ class ImageUploadApiController extends Controller
 
                 $img = Image::read(Storage::disk('public')->get($final));
 
+                // Save image record to files table
+                $fileRecord = $this->saveFileRecord($final, $img->width(), $img->height(), $country);
+
                 return (new BaseResource([
                     'url' => Storage::url($final),
                     'width' => $img->width(),
                     'height' => $img->height(),
                     'optimized' => true,
+                    'file_id' => $fileRecord?->id,
                 ]))->response($request)->setStatusCode(200);
             }
 

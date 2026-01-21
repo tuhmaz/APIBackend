@@ -70,7 +70,6 @@ class SitemapApiController extends Controller
         try {
             $db = $request->input('database', 'jo');
             Log::info("Starting sitemap generation for database: {$db}");
-            Log::info("Storage public root: " . config('filesystems.disks.public.root'));
             
             $connection = $this->getConnection($db);
 

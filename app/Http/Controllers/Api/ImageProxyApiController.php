@@ -69,7 +69,10 @@ class ImageProxyApiController extends Controller
         $allowed = ['jpg','jpeg','png','webp'];
 
         if (!in_array($ext, $allowed, true)) {
-            return $this->streamOriginal($source);
+            // Security: Prevent serving non-image files
+            return (new BaseResource(['error' => 'File type not allowed']))
+                ->response($request)
+                ->setStatusCode(403);
         }
 
         // Cache path
@@ -159,8 +162,9 @@ class ImageProxyApiController extends Controller
                     break;
             }
 
-            imagedestroy($src);
-            imagedestroy($dst);
+            // In PHP 8.0+, GD resources are objects and automatically garbage collected.
+            // imagedestroy() is deprecated and no longer needed.
+            unset($src, $dst);
 
             return $this->streamFile($cacheAbs, $ext);
 

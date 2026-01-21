@@ -164,12 +164,6 @@ class FrontendApiGuard
             if (in_array($ip, $trustedIps)) {
                 return true;
             }
-
-            // في بيئة الإنتاج، السماح للطلبات مع X-Requested-With فقط
-            // لأن المتصفحات لا ترسل هذا الـ header تلقائياً
-            if (app()->environment('production')) {
-                return true;
-            }
         }
 
         return false;
