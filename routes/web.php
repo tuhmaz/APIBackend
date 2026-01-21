@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -12,6 +13,12 @@ use Illuminate\Support\Facades\Route;
 | لا توجد routes web هنا - فقط API routes في routes/api.php
 |
 */
+
+// ==============================================
+// Auth Routes (Google Login)
+// ==============================================
+Route::get('/login/google', [AuthController::class, 'googleRedirect'])->name('login.google');
+Route::get('/login/google/callback', [AuthController::class, 'googleCallback']);
 
 // ==============================================
 // Legacy SEO Redirects (للروابط القديمة فقط)

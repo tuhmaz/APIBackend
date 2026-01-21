@@ -17,6 +17,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\AbstractProvider;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Resources\BaseResource;
@@ -328,7 +329,9 @@ class AuthApiController extends Controller
     {
         // For SPA, return the redirect URL as JSON
         if ($request->wantsJson() || $request->has('spa')) {
-            $redirectUrl = Socialite::driver('google')
+            /** @var AbstractProvider $driver */
+            $driver = Socialite::driver('google');
+            $redirectUrl = $driver
                 ->stateless()
                 ->redirect()
                 ->getTargetUrl();
@@ -340,7 +343,9 @@ class AuthApiController extends Controller
         }
 
         // For traditional web, do the redirect
-        return Socialite::driver('google')->stateless()->redirect();
+        /** @var AbstractProvider $driver */
+        $driver = Socialite::driver('google');
+        return $driver->stateless()->redirect();
     }
 
     /**
@@ -351,7 +356,9 @@ class AuthApiController extends Controller
     {
         try {
             // Get user from Google using the authorization code
-            $googleUser = Socialite::driver('google')->stateless()->user();
+            /** @var AbstractProvider $driver */
+            $driver = Socialite::driver('google');
+            $googleUser = $driver->stateless()->user();
 
             // Find or create user
             $user = User::where('email', $googleUser->email)->first();

@@ -8,6 +8,25 @@ use Illuminate\Support\Facades\Storage;
 
 class CategoryResource extends JsonResource
 {
+    /**
+     * Get proper storage URL (ensures api subdomain is used)
+     */
+    private function getStorageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        $url = Storage::url($path);
+
+        // Fix: ensure api subdomain is used for storage URLs in production
+        if (app()->environment('production') && str_contains($url, 'alemancenter.com') && !str_contains($url, 'api.alemancenter.com')) {
+            $url = str_replace('alemancenter.com', 'api.alemancenter.com', $url);
+        }
+
+        return $url;
+    }
+
     public function toArray($request)
     {
         return [
@@ -25,11 +44,11 @@ class CategoryResource extends JsonResource
             }),
             'depth'      => $this->depth,
             'icon'       => $this->icon,
-            'icon_url'   => $this->icon ? Storage::url($this->icon) : null,
+            'icon_url'   => $this->getStorageUrl($this->icon),
             'image'      => $this->image,
-            'image_url'  => $this->image ? Storage::url($this->image) : null,
+            'image_url'  => $this->getStorageUrl($this->image),
             'icon_image' => $this->icon_image,
-            'icon_image_url' => $this->icon_image ? Storage::url($this->icon_image) : null,
+            'icon_image_url' => $this->getStorageUrl($this->icon_image),
             'news_count' => isset($this->news_count) ? (int) $this->news_count : null,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

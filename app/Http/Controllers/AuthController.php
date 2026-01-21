@@ -628,8 +628,14 @@ class AuthController extends Controller
             // التأكد من إعادة توجيه المستخدم بشكل صحيح
             if (Auth::check()) {
                 Log::info('User successfully authenticated after Google login', ['user_id' => $user->id]);
-                return redirect()->intended('/dashboard')
-                    ->with('success', 'تم تسجيل الدخول بنجاح باستخدام حساب Google');
+                
+                // Generate Sanctum token for Frontend
+                $token = $user->createToken('google-login')->plainTextToken;
+                
+                // Redirect to Frontend with token
+                $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+                
+                return redirect()->to("{$frontendUrl}/auth/google/callback?token={$token}");
             } else {
                 Log::error('User not authenticated after Google login', ['user_id' => $user->id]);
                 return redirect()->route('login')
