@@ -138,7 +138,7 @@ class FileApiController extends Controller
         $database = $request->input('database', 'jo');
 
         $file = File::on($database)
-            ->with(['article.subject', 'article.schoolClass', 'post.subject'])
+            ->with(['article.subject', 'article.schoolClass', 'post.category'])
             ->findOrFail($id);
 
         $response = [
@@ -180,9 +180,9 @@ class FileApiController extends Controller
                 'title' => $file->post->title,
                 'meta_description' => $file->post->meta_description ?? $file->post->excerpt,
                 'image_url' => $file->post->image_url ?? $file->post->featured_image,
-                'subject' => $file->post->subject ? [
-                    'id' => $file->post->subject->id,
-                    'name' => $file->post->subject->name ?? $file->post->subject->subject_name,
+                'category' => $file->post->category ? [
+                    'id' => $file->post->category->id,
+                    'name' => $file->post->category->name,
                 ] : null,
             ];
         }
