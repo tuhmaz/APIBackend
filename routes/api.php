@@ -122,6 +122,9 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
     Route::get('/articles/by-class/{grade_level}', [ArticleApiController::class, 'indexByClass']);
     Route::get('/articles/by-keyword/{keyword}', [ArticleApiController::class, 'indexByKeyword']);
 
+    // Files (public)
+    Route::get('/files/{id}/info', [FileApiController::class, 'info']);
+
     // Categories
     Route::get('/categories', [CategoryApiController::class, 'index']);
     Route::get('/categories/{id}', [CategoryApiController::class, 'show']);
@@ -412,6 +415,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
             Route::get('/', [FileApiController::class, 'index']);
             Route::post('/', [FileApiController::class, 'store']);
             Route::get('/{id}', [FileApiController::class, 'show']);
+            Route::get('/{id}/info', [FileApiController::class, 'info']);
             Route::get('/{id}/download', [FileApiController::class, 'download']);
             Route::put('/{id}', [FileApiController::class, 'update']);
             Route::delete('/{id}', [FileApiController::class, 'destroy']);

@@ -130,6 +130,70 @@ class FileApiController extends Controller
     }
 
     /**
+     * GET /api/files/{id}/info
+     * جلب معلومات الملف مع المقال أو المنشور المرتبط (للصفحة التحميل)
+     */
+    public function info(Request $request, $id)
+    {
+        $database = $request->input('database', 'jo');
+
+        $file = File::on($database)
+            ->with(['article.subject', 'article.schoolClass', 'post.subject'])
+            ->findOrFail($id);
+
+        $response = [
+            'file' => [
+                'id' => $file->id,
+                'file_name' => $file->file_name,
+                'file_path' => $file->file_path,
+                'file_url' => Storage::url($file->file_path),
+                'file_type' => $file->file_type,
+                'file_size' => $file->file_size,
+                'mime_type' => $file->mime_type,
+                'category' => $file->file_category,
+            ],
+            'type' => null,
+            'item' => null,
+        ];
+
+        // تحديد نوع المحتوى المرتبط (مقال أو منشور)
+        if ($file->article_id && $file->article) {
+            $response['type'] = 'article';
+            $response['item'] = [
+                'id' => $file->article->id,
+                'title' => $file->article->title,
+                'meta_description' => $file->article->meta_description,
+                'image_url' => $file->article->image_url,
+                'subject' => $file->article->subject ? [
+                    'id' => $file->article->subject->id,
+                    'name' => $file->article->subject->name ?? $file->article->subject->subject_name,
+                ] : null,
+                'schoolClass' => $file->article->schoolClass ? [
+                    'id' => $file->article->schoolClass->id,
+                    'grade_name' => $file->article->schoolClass->grade_name,
+                ] : null,
+            ];
+        } elseif ($file->post_id && $file->post) {
+            $response['type'] = 'post';
+            $response['item'] = [
+                'id' => $file->post->id,
+                'title' => $file->post->title,
+                'meta_description' => $file->post->meta_description ?? $file->post->excerpt,
+                'image_url' => $file->post->image_url ?? $file->post->featured_image,
+                'subject' => $file->post->subject ? [
+                    'id' => $file->post->subject->id,
+                    'name' => $file->post->subject->name ?? $file->post->subject->subject_name,
+                ] : null,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $response,
+        ]);
+    }
+
+    /**
      * GET /api/files/{id}/download
      * تحميل ملف
      */

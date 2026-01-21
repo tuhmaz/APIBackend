@@ -52,14 +52,35 @@ class FrontApiController extends Controller
         'copyright_text',
 
         // إعدادات الإعلانات
-        'google_ads_desktop_classes',
-        'google_ads_mobile_classes',
-        'google_ads_desktop_classes_2',
-        'google_ads_mobile_classes_2',
-        'google_ads_desktop_articles',
-        'google_ads_mobile_articles',
         'google_ads_desktop_home',
+        'google_ads_desktop_home_2',
         'google_ads_mobile_home',
+        'google_ads_mobile_home_2',
+
+        'google_ads_desktop_classes',
+        'google_ads_desktop_classes_2',
+        'google_ads_mobile_classes',
+        'google_ads_mobile_classes_2',
+
+        'google_ads_desktop_subject',
+        'google_ads_desktop_subject_2',
+        'google_ads_mobile_subject',
+        'google_ads_mobile_subject_2',
+
+        'google_ads_desktop_article',
+        'google_ads_desktop_article_2',
+        'google_ads_mobile_article',
+        'google_ads_mobile_article_2',
+
+        'google_ads_desktop_news',
+        'google_ads_desktop_news_2',
+        'google_ads_mobile_news',
+        'google_ads_mobile_news_2',
+
+        'google_ads_desktop_download',
+        'google_ads_desktop_download_2',
+        'google_ads_mobile_download',
+        'google_ads_mobile_download_2',
 
         // إعدادات SEO العامة
         'meta_title',
