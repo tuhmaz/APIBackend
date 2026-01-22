@@ -20,24 +20,29 @@ class TrackVisitor
     public function handle(Request $request, Closure $next)
     {
         $ipAddress = $request->ip();
-        
+
         // Get location information using our VisitorService
         $geoData = $this->visitorService->getGeoDataFromIP($ipAddress);
-        
+
+        // Parse user agent for browser and OS
+        $uaData = $this->visitorService->analyzeUserAgent($request->userAgent());
+        $browser = $uaData['client']['name'] ?? 'Unknown';
+        $os = $uaData['os']['name'] ?? 'Unknown';
+
         // Update or create visitor tracking record
-        $visitor = VisitorTracking::firstOrCreate(
+        $visitor = VisitorTracking::updateOrCreate(
             ['ip_address' => $ipAddress],
             [
                 'user_agent' => $request->userAgent(),
                 'country' => $geoData['country'] ?? null,
                 'city' => $geoData['city'] ?? null,
+                'browser' => $browser,
+                'os' => $os,
+                'url' => $request->fullUrl(),
                 'user_id' => Auth::id(),
                 'last_activity' => now()
             ]
         );
-
-        // Always update last_activity
-        $visitor->update(['last_activity' => now()]);
 
         // Track page visit
         $visitor->pageVisits()->create([

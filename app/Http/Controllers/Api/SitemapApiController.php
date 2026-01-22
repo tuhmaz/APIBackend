@@ -41,17 +41,18 @@ class SitemapApiController extends Controller
         $types = ['articles', 'post', 'static'];
         $list = [];
 
+        $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
         foreach ($types as $type) {
             $file = "sitemaps/sitemap_{$type}_{$db}.xml";
 
             $list[$type] = [
-                'exists' => Storage::disk('public')->exists($file),
+                'exists' => Storage::disk('frontend_public')->exists($file),
                 'last_modified' =>
-                    Storage::disk('public')->exists($file)
-                    ? Carbon::createFromTimestamp(Storage::disk('public')->lastModified($file))->toDateTimeString()
+                    Storage::disk('frontend_public')->exists($file)
+                    ? Carbon::createFromTimestamp(Storage::disk('frontend_public')->lastModified($file))->toDateTimeString()
                     : null,
-                'url' => Storage::disk('public')->exists($file)
-                    ? url("storage/{$file}")
+                'url' => Storage::disk('frontend_public')->exists($file)
+                    ? $frontendUrl . '/' . $file
                     : null
             ];
         }
@@ -98,13 +99,13 @@ class SitemapApiController extends Controller
     {
         $file = "sitemaps/sitemap_{$type}_{$database}.xml";
 
-        if (!Storage::disk('public')->exists($file)) {
+        if (!Storage::disk('frontend_public')->exists($file)) {
             return (new BaseResource(['message' => 'Sitemap not found']))
                 ->response(request())
                 ->setStatusCode(404);
         }
 
-        Storage::disk('public')->delete($file);
+        Storage::disk('frontend_public')->delete($file);
 
         return new BaseResource(['message' => 'Sitemap deleted successfully']);
     }
@@ -119,7 +120,7 @@ class SitemapApiController extends Controller
         $count = 0;
 
         Article::on($connection)->get()->each(function ($article) use ($sitemap, $db, &$count) {
-            $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com') . '/' . $db . '/articles/' . $article->id;
+            $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com') . '/' . $db . '/lesson/articles/' . $article->id;
             $url = Url::create($frontendUrl)
                 ->setLastModificationDate($article->updated_at)
                 ->setChangeFrequency(Url::CHANGE_FREQUENCY_WEEKLY)
@@ -135,7 +136,7 @@ class SitemapApiController extends Controller
 
         Log::info("Found {$count} articles. Writing to sitemaps/sitemap_articles_{$db}.xml");
 
-        Storage::disk('public')
+        Storage::disk('frontend_public')
             ->put("sitemaps/sitemap_articles_{$db}.xml", $sitemap->render());
             
         Log::info("File written: sitemaps/sitemap_articles_{$db}.xml");
@@ -164,7 +165,7 @@ class SitemapApiController extends Controller
             $sitemap->add($url);
         });
 
-        Storage::disk('public')
+        Storage::disk('frontend_public')
             ->put("sitemaps/sitemap_post_{$db}.xml", $sitemap->render());
     }
 
@@ -178,14 +179,14 @@ class SitemapApiController extends Controller
         // Home
         $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
         $sitemap->add(
-            Url::create($frontendUrl)
+            Url::create($frontendUrl . '/' . $db)
                 ->setPriority(1.0)
                 ->setChangeFrequency(Url::CHANGE_FREQUENCY_DAILY)
         );
 
         // الصفوف
         SchoolClass::on($connection)->get()->each(function ($class) use ($sitemap, $db) {
-            $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com') . '/' . $db . '/classes/' . $class->id;
+            $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com') . '/' . $db . '/lesson/' . $class->id;
             $sitemap->add(
                 Url::create($frontendUrl)
                     ->setLastModificationDate($class->updated_at)
@@ -196,7 +197,7 @@ class SitemapApiController extends Controller
 
         // التصنيفات
         Category::on($connection)->get()->each(function ($category) use ($sitemap, $db) {
-            $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com') . '/' . $db . '/categories/' . $category->slug;
+            $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com') . '/' . $db . '/posts/category/' . $category->id;
             $sitemap->add(
                 Url::create($frontendUrl)
                     ->setLastModificationDate($category->updated_at)
@@ -205,7 +206,7 @@ class SitemapApiController extends Controller
             );
         });
 
-        Storage::disk('public')->put(
+        Storage::disk('frontend_public')->put(
             "sitemaps/sitemap_static_{$db}.xml",
             $sitemap->render()
         );
@@ -218,19 +219,20 @@ class SitemapApiController extends Controller
     {
         $index = SitemapIndex::create();
         $types = ['articles', 'post', 'static'];
+        $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
 
         foreach ($types as $type) {
             $file = "sitemaps/sitemap_{$type}_{$db}.xml";
 
-            if (Storage::disk('public')->exists($file)) {
+            if (Storage::disk('frontend_public')->exists($file)) {
                 $index->add(
-                    url("storage/{$file}"),
-                    Carbon::createFromTimestamp(Storage::disk('public')->lastModified($file))
+                    $frontendUrl . '/' . $file,
+                    Carbon::createFromTimestamp(Storage::disk('frontend_public')->lastModified($file))
                 );
             }
         }
 
-        Storage::disk('public')->put(
+        Storage::disk('frontend_public')->put(
             "sitemaps/sitemap_index_{$db}.xml",
             $index->render()
         );

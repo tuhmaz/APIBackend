@@ -70,17 +70,22 @@ class AppServiceProvider extends ServiceProvider
             // Use Bootstrap 5 pagination views across the app
             Paginator::useBootstrapFive();
             // Load dynamic settings from database and merge into config
-            if (Schema::hasTable('settings')) {
-                // Cache settings for 1 hour to reduce database queries
-                $dbSettings = \Illuminate\Support\Facades\Cache::remember('app_settings', 3600, function () {
-                    return Setting::pluck('value','key')->toArray();
-                });
-                Config::set('settings', array_merge(config('settings', []), $dbSettings));
-                // Set application locale from session or settings
-                $locale = session('locale') ?? config('settings.site_language');
-                if (in_array($locale, ['en', 'ar'])) {
-                    app()->setLocale($locale);
+            try {
+                if (Schema::hasTable('settings')) {
+                    // Cache settings for 1 hour to reduce database queries
+                    $dbSettings = \Illuminate\Support\Facades\Cache::remember('app_settings', 3600, function () {
+                        return Setting::pluck('value','key')->toArray();
+                    });
+                    Config::set('settings', array_merge(config('settings', []), $dbSettings));
+                    // Set application locale from session or settings
+                    $locale = session('locale') ?? config('settings.site_language');
+                    if (in_array($locale, ['en', 'ar'])) {
+                        app()->setLocale($locale);
+                    }
                 }
+            } catch (\Exception $e) {
+                // If database connection fails, just log it and proceed without settings
+                Log::warning('Could not load settings from database: ' . $e->getMessage());
             }
 
             // Load Passport keys (only if package is installed and keys path exists)

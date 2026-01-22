@@ -8,6 +8,18 @@ use Illuminate\Support\Facades\Log;
 
 class SystemService
 {
+    /**
+     * Check if running on Windows
+     */
+    private function isWindows(): bool
+    {
+        // PHP_OS_FAMILY is available in PHP 7.2+
+        if (defined('PHP_OS_FAMILY')) {
+            return PHP_OS_FAMILY === 'Windows';
+        }
+        // Fallback for older PHP versions
+        return strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    }
 
     /**
      * Get complete system information
@@ -134,7 +146,7 @@ class SystemService
      */
     private function getCpuCores()
     {
-        if (PHP_OS_FAMILY === 'Windows') {
+        if ($this->isWindows()) {
             $cmd = 'wmic cpu get NumberOfCores';
             $output = [];
             exec($cmd, $output);
@@ -157,7 +169,7 @@ class SystemService
      */
     private function getLoadAverage()
     {
-        if (PHP_OS_FAMILY === 'Windows') {
+        if ($this->isWindows()) {
             return $this->getWindowsCpuLoad();
         }
         return function_exists('sys_getloadavg') ? sys_getloadavg() : [0, 0, 0];
@@ -189,7 +201,7 @@ class SystemService
      */
     private function getCpuUsagePercentage()
     {
-        if (PHP_OS_FAMILY === 'Windows') {
+        if ($this->isWindows()) {
             $cmd = 'wmic cpu get loadpercentage';
             $output = [];
             exec($cmd, $output);
@@ -216,7 +228,7 @@ class SystemService
     private function getMemoryInfo()
     {
         try {
-            if (PHP_OS_FAMILY === 'Windows') {
+            if ($this->isWindows()) {
                 return $this->getWindowsMemoryInfo();
             }
             return $this->getLinuxMemoryInfo();
@@ -358,7 +370,7 @@ class SystemService
     private function getDiskUsage()
     {
         try {
-            $path = PHP_OS_FAMILY === 'Windows' ? 'C:' : '/';
+            $path = $this->isWindows() ? 'C:' : '/';
             $total = @disk_total_space($path);
             $free = @disk_free_space($path);
             // Fallback to application base path if root path is restricted
@@ -426,7 +438,7 @@ class SystemService
      */
     private function getUptime()
     {
-        if (PHP_OS_FAMILY === 'Windows') {
+        if ($this->isWindows()) {
             $cmd = 'wmic os get lastbootuptime';
             $output = [];
             exec($cmd, $output);

@@ -30,7 +30,7 @@ class SitemapService
         $articles = Article::on($database)->where('status', 1)->get();
 
         foreach ($articles as $article) {
-            $articleUrl = $frontendUrl . '/' . $database . '/article/' . $article->id;
+            $articleUrl = $frontendUrl . '/' . $database . '/lesson/articles/' . $article->id;
             $url = Url::create($articleUrl)
                 ->setLastModificationDate($article->updated_at)
                 ->setChangeFrequency(Url::CHANGE_FREQUENCY_WEEKLY)
@@ -47,7 +47,7 @@ class SitemapService
         }
 
         $fileName = "sitemaps/sitemap_articles_{$database}.xml";
-        Storage::disk('public')->put($fileName, $sitemap->render());
+        Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
         $this->updateSitemapIndex($database);
     }
@@ -152,25 +152,26 @@ class SitemapService
     protected function updateSitemapIndex(string $database): void
     {
         $sitemapIndex = SitemapIndex::create();
+        $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
 
         $types = ['articles', 'post', 'news', 'static'];
 
         foreach ($types as $type) {
             $fileName = "sitemaps/sitemap_{$type}_{$database}.xml";
 
-            if (! Storage::disk('public')->exists($fileName)) {
+            if (! Storage::disk('frontend_public')->exists($fileName)) {
                 continue;
             }
 
-            $lastModified = Storage::disk('public')->lastModified($fileName);
+            $lastModified = Storage::disk('frontend_public')->lastModified($fileName);
 
             $sitemapIndex->add(
-                URLFacade::to(Storage::url($fileName)),
+                $frontendUrl . '/' . $fileName,
                 Carbon::createFromTimestamp($lastModified)
             );
         }
 
-        Storage::disk('public')->put(
+        Storage::disk('frontend_public')->put(
             "sitemaps/sitemap_index_{$database}.xml",
             $sitemapIndex->render()
         );

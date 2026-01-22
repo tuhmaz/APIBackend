@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use App\Models\VisitorTracking;
 use App\Models\VisitorSession;
+use App\Services\VisitorService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
@@ -12,6 +13,13 @@ use Illuminate\Http\Request;
 
 class VisitorTrackingMiddleware
 {
+    protected $visitorService;
+
+    public function __construct(VisitorService $visitorService)
+    {
+        $this->visitorService = $visitorService;
+    }
+
     public function handle(Request $request, Closure $next)
     {
         $response = $next($request);
@@ -80,11 +88,15 @@ class VisitorTrackingMiddleware
             elseif (strpos($ua, 'iPhone') !== false || strpos($ua, 'iPad') !== false) $os = 'iOS';
             elseif (strpos($ua, 'bot') !== false || strpos($ua, 'crawl') !== false) $os = 'Bot';
 
-            // 5. DB Write (Safe Update)
+            // 5. Get geo data (cached, non-blocking)
+            $geoData = $this->visitorService->getGeoDataFromIP($ip);
+            $country = $geoData['country'] ?? null;
+            $city = $geoData['city'] ?? null;
+
+            // 6. DB Write (Safe Update)
             VisitorTracking::updateOrCreate(
                 [
                     'ip_address' => $ip,
-                    'user_id'    => $userId,
                 ],
                 [
                     'user_agent'    => substr($userAgent, 0, 255),
@@ -92,15 +104,15 @@ class VisitorTrackingMiddleware
                     'referer'       => $referer ? substr($referer, 0, 255) : null,
                     'browser'       => $browser,
                     'os'            => $os,
+                    'country'       => $country,
+                    'city'          => $city,
                     'status_code'   => $statusCode,
+                    'user_id'       => $userId,
                     'last_activity' => now(),
-                    // Geo fields are intentionally left untouched or null to avoid blocking
-                    // 'country' => null, 
-                    // 'city' => null,
                 ]
             );
 
-            // 6. Optional: Visitor Session Log (Debounced)
+            // 7. Optional: Visitor Session Log (Debounced)
             // Only if strictly needed, otherwise skip to save another DB write
             // $this->logSession($request, $user, $ip);
 

@@ -47,10 +47,10 @@ class SitemapController extends Controller
 
     foreach ($sitemapTypes as $type) {
       $filename = "sitemaps/sitemap_{$type}_{$database}.xml";
-      if (Storage::disk('public')->exists($filename)) {
+      if (Storage::disk('frontend_public')->exists($filename)) {
         $sitemapData[$type] = [
           'exists' => true,
-          'last_modified' => Storage::disk('public')->lastModified($filename)
+          'last_modified' => Storage::disk('frontend_public')->lastModified($filename)
         ];
       } else {
         $sitemapData[$type] = [
@@ -70,7 +70,7 @@ class SitemapController extends Controller
     }
 
     $database = session('database', 'defaultDatabase'); // Assume 'defaultDatabase' as your fallback
-    \Config::set('database.default', $database); // Set the Laravel default database dynamically
+    Config::set('database.default', $database); // Set the Laravel default database dynamically
 
     // Optionally, set connection for each model if they differ
     $articles = Article::on($database)->orderBy('updated_at', 'desc')->get();
@@ -205,13 +205,14 @@ class SitemapController extends Controller
   public function generateArticlesSitemap(Request $request)
   {
     $database = $this->getConnection($request);
+    $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
 
     // إنشاء خريطة موقع جديدة
     $sitemap = new \Spatie\Sitemap\Sitemap();
 
-    Article::on($database)->get()->each(function (Article $article) use ($sitemap, $database) {
+    Article::on($database)->get()->each(function (Article $article) use ($sitemap, $database, $frontendUrl) {
       // إنشاء عنوان URL مع تعيين جميع السمات بشكل صريح
-      $url = Url::create(route('frontend.articles.show', ['database' => $database, 'article' => $article->id]));
+      $url = Url::create($frontendUrl . '/' . $database . '/lesson/articles/' . $article->id);
 
       // تعيين تاريخ آخر تعديل
       $url->setLastModificationDate($article->updated_at);
@@ -243,7 +244,7 @@ class SitemapController extends Controller
 
     // Save the sitemap to the public disk
     $fileName = "sitemaps/sitemap_articles_{$database}.xml";
-    Storage::disk('public')->put($fileName, $sitemap->render());
+    Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
     // عودة قيمة لتأكيد نجاح العملية
     return true;
@@ -252,6 +253,7 @@ class SitemapController extends Controller
   public function generatePostSitemap(Request $request)
   {
       $database = $this->getConnection($request);
+      $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
 
       // Use dynamic database connection
       $posts = Post::on($database)->get();
@@ -263,7 +265,7 @@ class SitemapController extends Controller
 
       foreach ($posts as $post) {
           // إنشاء عنوان URL مع تعيين جميع السمات بشكل صريح
-          $url = Url::create(route('content.frontend.posts.show', ['database' => $database, 'id' => $post->id]));
+          $url = Url::create($frontendUrl . '/' . $database . '/posts/' . $post->id);
 
           // تعيين تاريخ آخر تعديل
           $url->setLastModificationDate($post->updated_at);
@@ -297,7 +299,7 @@ class SitemapController extends Controller
 
       // Save the sitemap to the public disk
       $fileName = "sitemaps/sitemap_post_{$database}.xml";
-      Storage::disk('public')->put($fileName, $sitemap->render());
+      Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
       // عودة قيمة لتأكيد نجاح العملية
       return true;
@@ -306,14 +308,15 @@ class SitemapController extends Controller
   public function generateStaticSitemap(Request $request)
   {
     $database = $this->getConnection($request);
+    $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
     $sitemap = Sitemap::create();
 
-    $sitemap->add(Url::create(route('home'))
+    $sitemap->add(Url::create($frontendUrl . '/' . $database)
       ->setChangeFrequency(Url::CHANGE_FREQUENCY_DAILY)
       ->setPriority(1.0));
 
-    SchoolClass::on($database)->get()->each(function (SchoolClass $class) use ($sitemap, $database) {
-      $url = Url::create(route('frontend.lesson.show', ['database' => $database, 'id' => $class->id]))
+    SchoolClass::on($database)->get()->each(function (SchoolClass $class) use ($sitemap, $database, $frontendUrl) {
+      $url = Url::create($frontendUrl . '/' . $database . '/lesson/' . $class->id)
         ->setLastModificationDate($class->updated_at)
         ->setChangeFrequency(Url::CHANGE_FREQUENCY_MONTHLY)
         ->setPriority(0.6);
@@ -321,8 +324,8 @@ class SitemapController extends Controller
       $sitemap->add($url);
     });
 
-    Category::on($database)->get()->each(function (Category $category) use ($sitemap, $database) {
-      $url = Url::create(route('content.frontend.categories.show', ['database' => $database, 'category' => $category->slug]))
+    Category::on($database)->get()->each(function (Category $category) use ($sitemap, $database, $frontendUrl) {
+      $url = Url::create($frontendUrl . '/' . $database . '/posts/category/' . $category->id)
         ->setLastModificationDate($category->updated_at)
         ->setChangeFrequency(Url::CHANGE_FREQUENCY_MONTHLY)
         ->setPriority(0.5);
@@ -331,15 +334,15 @@ class SitemapController extends Controller
     });
 
      $fileName = "sitemaps/sitemap_static_{$database}.xml";
-    Storage::disk('public')->put($fileName, $sitemap->render());
+    Storage::disk('frontend_public')->put($fileName, $sitemap->render());
   }
 
   public function delete($type, $database)
   {
     $fileName = "sitemaps/sitemap_{$type}_{$database}.xml";
 
-    if (Storage::disk('public')->exists($fileName)) {
-      Storage::disk('public')->delete($fileName);
+    if (Storage::disk('frontend_public')->exists($fileName)) {
+      Storage::disk('frontend_public')->delete($fileName);
       return redirect()->back()->with('success', 'Sitemap deleted successfully.');
     }
 
@@ -355,21 +358,21 @@ class SitemapController extends Controller
     $sitemapIndex = \Spatie\Sitemap\SitemapIndex::create();
 
     // Use a secure base URL for links in the sitemap index
-    $baseUrl = rtrim(secure_url('/'), '/');
+    $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
 
     $types = ['articles', 'post', 'static'];
 
     foreach ($types as $type) {
       $fileName = "sitemaps/sitemap_{$type}_{$database}.xml";
-      if (Storage::disk('public')->exists($fileName)) {
-        $lastModified = Storage::disk('public')->lastModified($fileName);
-        $sitemapUrl = $baseUrl . '/storage/' . $fileName;
+      if (Storage::disk('frontend_public')->exists($fileName)) {
+        $lastModified = Storage::disk('frontend_public')->lastModified($fileName);
+        $sitemapUrl = $frontendUrl . '/' . $fileName;
         $sitemapIndex->add($sitemapUrl, Carbon::createFromTimestamp($lastModified));
       }
     }
 
     $indexFileName = "sitemaps/sitemap_index_{$database}.xml";
-    Storage::disk('public')->put($indexFileName, $sitemapIndex->render());
+    Storage::disk('frontend_public')->put($indexFileName, $sitemapIndex->render());
 
     return true;
   }
