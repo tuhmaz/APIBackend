@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\URL as URLFacade;
 
 class SitemapService
 {
+    private function ensureSitemapDirectory(): void
+    {
+        Storage::disk('frontend_public')->makeDirectory('storage/sitemaps');
+    }
      private function getFirstImageFromContent($content, $defaultImageUrl)
     {
         preg_match('/<img[^>]+src="([^">]+)"/', $content, $matches);
@@ -47,6 +51,7 @@ class SitemapService
         }
 
         $fileName = "storage/sitemaps/sitemap_articles_{$database}.xml";
+        $this->ensureSitemapDirectory();
         Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
         $this->updateSitemapIndex($database);
@@ -83,6 +88,7 @@ class SitemapService
 
         // Save the sitemap
         $fileName = "storage/sitemaps/sitemap_news_{$database}.xml";
+        $this->ensureSitemapDirectory();
         Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
         $this->updateSitemapIndex($database);
@@ -128,6 +134,7 @@ class SitemapService
         // Save the sitemap
         // Remove legacy filename if it exists to avoid stale files
         $legacyFile = "storage/sitemaps/sitemap_posts_{$database}.xml";
+        $this->ensureSitemapDirectory();
         if (Storage::disk('frontend_public')->exists($legacyFile)) {
             Storage::disk('frontend_public')->delete($legacyFile);
         }
@@ -171,6 +178,7 @@ class SitemapService
             );
         }
 
+        $this->ensureSitemapDirectory();
         Storage::disk('frontend_public')->put(
             "storage/sitemaps/sitemap_index_{$database}.xml",
             $sitemapIndex->render()

@@ -49,7 +49,7 @@ return [
 
         'frontend_public' => [
             'driver' => 'local',
-            'root' => base_path('../website/public'),
+            'root' => env('FRONTEND_PUBLIC_PATH', base_path('../website/public')),
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

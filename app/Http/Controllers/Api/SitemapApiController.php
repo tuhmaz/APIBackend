@@ -20,6 +20,13 @@ use App\Http\Resources\BaseResource;
 class SitemapApiController extends Controller
 {
     /**
+     * Ensure sitemap directory exists on the frontend public disk.
+     */
+    private function ensureSitemapDirectory(): void
+    {
+        Storage::disk('frontend_public')->makeDirectory('storage/sitemaps');
+    }
+    /**
      * اختيار اتصال قاعدة البيانات
      */
     private function getConnection(string $db): string
@@ -147,6 +154,7 @@ class SitemapApiController extends Controller
 
         Log::info("Found {$count} articles. Writing to storage/sitemaps/sitemap_articles_{$db}.xml");
 
+        $this->ensureSitemapDirectory();
         Storage::disk('frontend_public')
             ->put("storage/sitemaps/sitemap_articles_{$db}.xml", $sitemap->render());
 
@@ -189,6 +197,7 @@ class SitemapApiController extends Controller
 
         Log::info("Found {$count} posts. Writing to storage/sitemaps/sitemap_post_{$db}.xml");
 
+        $this->ensureSitemapDirectory();
         Storage::disk('frontend_public')
             ->put("storage/sitemaps/sitemap_post_{$db}.xml", $sitemap->render());
     }
@@ -230,6 +239,7 @@ class SitemapApiController extends Controller
             );
         });
 
+        $this->ensureSitemapDirectory();
         Storage::disk('frontend_public')->put(
             "storage/sitemaps/sitemap_static_{$db}.xml",
             $sitemap->render()
@@ -260,6 +270,7 @@ class SitemapApiController extends Controller
             }
         }
 
+        $this->ensureSitemapDirectory();
         Storage::disk('frontend_public')->put(
             "storage/sitemaps/sitemap_index_{$db}.xml",
             $index->render()

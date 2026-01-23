@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\Config;
 
 class SitemapController extends Controller
 {
+  private function ensureSitemapDirectory(): void
+  {
+    Storage::disk('frontend_public')->makeDirectory('storage/sitemaps');
+  }
   public function setDatabase(Request $request)
   {
     $request->validate([
@@ -244,6 +248,7 @@ class SitemapController extends Controller
 
     // Save the sitemap to the public disk
     $fileName = "storage/sitemaps/sitemap_articles_{$database}.xml";
+    $this->ensureSitemapDirectory();
     Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
     // عودة قيمة لتأكيد نجاح العملية
@@ -299,6 +304,7 @@ class SitemapController extends Controller
 
       // Save the sitemap to the public disk
       $fileName = "storage/sitemaps/sitemap_post_{$database}.xml";
+      $this->ensureSitemapDirectory();
       Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
       // عودة قيمة لتأكيد نجاح العملية
@@ -334,6 +340,7 @@ class SitemapController extends Controller
     });
 
      $fileName = "storage/sitemaps/sitemap_static_{$database}.xml";
+    $this->ensureSitemapDirectory();
     Storage::disk('frontend_public')->put($fileName, $sitemap->render());
   }
 
@@ -372,6 +379,7 @@ class SitemapController extends Controller
     }
 
     $indexFileName = "storage/sitemaps/sitemap_index_{$database}.xml";
+    $this->ensureSitemapDirectory();
     Storage::disk('frontend_public')->put($indexFileName, $sitemapIndex->render());
 
     return true;
