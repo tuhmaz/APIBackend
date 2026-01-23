@@ -1,5 +1,34 @@
 <?php
 
+$frontendPublicPath = env('FRONTEND_PUBLIC_PATH');
+if (!$frontendPublicPath) {
+    $base = base_path();
+    $candidates = [
+        // Local monorepo (backend + website/)
+        $base . '/../httpdocs/public',
+        // Plesk/httpdocs common layouts
+        $base . '/../public',
+        $base . '/../httpdocs/public',
+        $base . '/../../httpdocs/public',
+        dirname($base) . '/public',
+        dirname($base, 2) . '/public',
+        dirname($base, 2) . '/httpdocs/public',
+        dirname($base, 3) . '/httpdocs/public',
+    ];
+
+    foreach ($candidates as $candidate) {
+        $resolved = realpath($candidate) ?: $candidate;
+        if (is_dir($resolved)) {
+            $frontendPublicPath = $resolved;
+            break;
+        }
+    }
+}
+
+if (!$frontendPublicPath) {
+    $frontendPublicPath = base_path('../httpdocs/public');
+}
+
 return [
 
     /*
@@ -49,7 +78,7 @@ return [
 
         'frontend_public' => [
             'driver' => 'local',
-            'root' => env('FRONTEND_PUBLIC_PATH', base_path('../website/public')),
+            'root' => $frontendPublicPath,
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

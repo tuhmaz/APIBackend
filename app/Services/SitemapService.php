@@ -18,6 +18,24 @@ class SitemapService
     {
         Storage::disk('frontend_public')->makeDirectory('storage/sitemaps');
     }
+
+    private function resolveImageUrl(?string $imagePath, string $apiUrl): ?string
+    {
+        if (!$imagePath) {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $imagePath)) {
+            return $imagePath;
+        }
+
+        $url = Storage::url($imagePath);
+        if (preg_match('#^https?://#i', $url)) {
+            return $url;
+        }
+
+        return rtrim($apiUrl, '/') . '/' . ltrim($url, '/');
+    }
      private function getFirstImageFromContent($content, $defaultImageUrl)
     {
         preg_match('/<img[^>]+src="([^">]+)"/', $content, $matches);
@@ -115,7 +133,7 @@ class SitemapService
             $imageUrl = null;
 
             if (! empty($post->image)) {
-                $imageUrl = Storage::url($post->image);
+                $imageUrl = $this->resolveImageUrl($post->image, $apiUrl);
             }
 
             if (! $imageUrl) {

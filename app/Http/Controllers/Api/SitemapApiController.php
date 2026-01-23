@@ -26,6 +26,24 @@ class SitemapApiController extends Controller
     {
         Storage::disk('frontend_public')->makeDirectory('storage/sitemaps');
     }
+
+    private function resolveImageUrl(?string $imagePath, string $appUrl): ?string
+    {
+        if (!$imagePath) {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $imagePath)) {
+            return $imagePath;
+        }
+
+        $url = Storage::url($imagePath);
+        if (preg_match('#^https?://#i', $url)) {
+            return $url;
+        }
+
+        return rtrim($appUrl, '/') . '/' . ltrim($url, '/');
+    }
     /**
      * اختيار اتصال قاعدة البيانات
      */
@@ -185,8 +203,12 @@ class SitemapApiController extends Controller
                         ->setPriority(0.70);
 
                     $image = $post->image
-                        ? $appUrl . Storage::url($post->image)
-                        : $defaultImage;
+                        ? $this->resolveImageUrl($post->image, $appUrl)
+                        : null;
+
+                    if (!$image) {
+                        $image = $defaultImage;
+                    }
 
                     $url->addImage($image, $post->title);
 
