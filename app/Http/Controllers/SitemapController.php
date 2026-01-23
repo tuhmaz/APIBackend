@@ -46,7 +46,7 @@ class SitemapController extends Controller
     $sitemapData = [];
 
     foreach ($sitemapTypes as $type) {
-      $filename = "sitemaps/sitemap_{$type}_{$database}.xml";
+      $filename = "storage/sitemaps/sitemap_{$type}_{$database}.xml";
       if (Storage::disk('frontend_public')->exists($filename)) {
         $sitemapData[$type] = [
           'exists' => true,
@@ -243,7 +243,7 @@ class SitemapController extends Controller
     });
 
     // Save the sitemap to the public disk
-    $fileName = "sitemaps/sitemap_articles_{$database}.xml";
+    $fileName = "storage/sitemaps/sitemap_articles_{$database}.xml";
     Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
     // عودة قيمة لتأكيد نجاح العملية
@@ -298,7 +298,7 @@ class SitemapController extends Controller
       }
 
       // Save the sitemap to the public disk
-      $fileName = "sitemaps/sitemap_post_{$database}.xml";
+      $fileName = "storage/sitemaps/sitemap_post_{$database}.xml";
       Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
       // عودة قيمة لتأكيد نجاح العملية
@@ -333,13 +333,13 @@ class SitemapController extends Controller
       $sitemap->add($url);
     });
 
-     $fileName = "sitemaps/sitemap_static_{$database}.xml";
+     $fileName = "storage/sitemaps/sitemap_static_{$database}.xml";
     Storage::disk('frontend_public')->put($fileName, $sitemap->render());
   }
 
   public function delete($type, $database)
   {
-    $fileName = "sitemaps/sitemap_{$type}_{$database}.xml";
+    $fileName = "storage/sitemaps/sitemap_{$type}_{$database}.xml";
 
     if (Storage::disk('frontend_public')->exists($fileName)) {
       Storage::disk('frontend_public')->delete($fileName);
@@ -363,7 +363,7 @@ class SitemapController extends Controller
     $types = ['articles', 'post', 'static'];
 
     foreach ($types as $type) {
-      $fileName = "sitemaps/sitemap_{$type}_{$database}.xml";
+      $fileName = "storage/sitemaps/sitemap_{$type}_{$database}.xml";
       if (Storage::disk('frontend_public')->exists($fileName)) {
         $lastModified = Storage::disk('frontend_public')->lastModified($fileName);
         $sitemapUrl = $frontendUrl . '/' . $fileName;
@@ -371,7 +371,7 @@ class SitemapController extends Controller
       }
     }
 
-    $indexFileName = "sitemaps/sitemap_index_{$database}.xml";
+    $indexFileName = "storage/sitemaps/sitemap_index_{$database}.xml";
     Storage::disk('frontend_public')->put($indexFileName, $sitemapIndex->render());
 
     return true;

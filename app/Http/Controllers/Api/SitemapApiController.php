@@ -43,7 +43,7 @@ class SitemapApiController extends Controller
 
         $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
         foreach ($types as $type) {
-            $file = "sitemaps/sitemap_{$type}_{$db}.xml";
+            $file = "storage/sitemaps/sitemap_{$type}_{$db}.xml";
 
             $list[$type] = [
                 'exists' => Storage::disk('frontend_public')->exists($file),
@@ -101,7 +101,7 @@ class SitemapApiController extends Controller
      */
     public function delete($type, $database)
     {
-        $file = "sitemaps/sitemap_{$type}_{$database}.xml";
+        $file = "storage/sitemaps/sitemap_{$type}_{$database}.xml";
 
         if (!Storage::disk('frontend_public')->exists($file)) {
             return (new BaseResource(['message' => 'Sitemap not found']))
@@ -145,12 +145,12 @@ class SitemapApiController extends Controller
                 }
             });
 
-        Log::info("Found {$count} articles. Writing to sitemaps/sitemap_articles_{$db}.xml");
+        Log::info("Found {$count} articles. Writing to storage/sitemaps/sitemap_articles_{$db}.xml");
 
         Storage::disk('frontend_public')
-            ->put("sitemaps/sitemap_articles_{$db}.xml", $sitemap->render());
+            ->put("storage/sitemaps/sitemap_articles_{$db}.xml", $sitemap->render());
 
-        Log::info("File written: sitemaps/sitemap_articles_{$db}.xml");
+        Log::info("File written: storage/sitemaps/sitemap_articles_{$db}.xml");
     }
 
     /**
@@ -187,10 +187,10 @@ class SitemapApiController extends Controller
                 }
             });
 
-        Log::info("Found {$count} posts. Writing to sitemaps/sitemap_post_{$db}.xml");
+        Log::info("Found {$count} posts. Writing to storage/sitemaps/sitemap_post_{$db}.xml");
 
         Storage::disk('frontend_public')
-            ->put("sitemaps/sitemap_post_{$db}.xml", $sitemap->render());
+            ->put("storage/sitemaps/sitemap_post_{$db}.xml", $sitemap->render());
     }
 
     /**
@@ -231,7 +231,7 @@ class SitemapApiController extends Controller
         });
 
         Storage::disk('frontend_public')->put(
-            "sitemaps/sitemap_static_{$db}.xml",
+            "storage/sitemaps/sitemap_static_{$db}.xml",
             $sitemap->render()
         );
     }
@@ -246,18 +246,22 @@ class SitemapApiController extends Controller
         $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com');
 
         foreach ($types as $type) {
-            $file = "sitemaps/sitemap_{$type}_{$db}.xml";
+            $file = "storage/sitemaps/sitemap_{$type}_{$db}.xml";
 
             if (Storage::disk('frontend_public')->exists($file)) {
-                $index->add(
-                    $frontendUrl . '/' . $file,
-                    Carbon::createFromTimestamp(Storage::disk('frontend_public')->lastModified($file))
-                );
+                // Check if the sitemap is not empty (has at least one URL)
+                $content = Storage::disk('frontend_public')->get($file);
+                if (strpos($content, '<url>') !== false) {
+                    $index->add(
+                        $frontendUrl . '/' . $file,
+                        Carbon::createFromTimestamp(Storage::disk('frontend_public')->lastModified($file))
+                    );
+                }
             }
         }
 
         Storage::disk('frontend_public')->put(
-            "sitemaps/sitemap_index_{$db}.xml",
+            "storage/sitemaps/sitemap_index_{$db}.xml",
             $index->render()
         );
     }

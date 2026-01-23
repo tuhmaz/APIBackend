@@ -46,7 +46,7 @@ class SitemapService
             $sitemap->add($url);
         }
 
-        $fileName = "sitemaps/sitemap_articles_{$database}.xml";
+        $fileName = "storage/sitemaps/sitemap_articles_{$database}.xml";
         Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
         $this->updateSitemapIndex($database);
@@ -82,8 +82,8 @@ class SitemapService
         }
 
         // Save the sitemap
-        $fileName = "sitemaps/sitemap_news_{$database}.xml";
-        Storage::disk('public')->put($fileName, $sitemap->render());
+        $fileName = "storage/sitemaps/sitemap_news_{$database}.xml";
+        Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
         $this->updateSitemapIndex($database);
     }
@@ -127,13 +127,13 @@ class SitemapService
 
         // Save the sitemap
         // Remove legacy filename if it exists to avoid stale files
-        $legacyFile = "sitemaps/sitemap_posts_{$database}.xml";
-        if (Storage::disk('public')->exists($legacyFile)) {
-            Storage::disk('public')->delete($legacyFile);
+        $legacyFile = "storage/sitemaps/sitemap_posts_{$database}.xml";
+        if (Storage::disk('frontend_public')->exists($legacyFile)) {
+            Storage::disk('frontend_public')->delete($legacyFile);
         }
 
-        $fileName = "sitemaps/sitemap_post_{$database}.xml";
-        Storage::disk('public')->put($fileName, $sitemap->render());
+        $fileName = "storage/sitemaps/sitemap_post_{$database}.xml";
+        Storage::disk('frontend_public')->put($fileName, $sitemap->render());
 
         $this->updateSitemapIndex($database);
     }
@@ -157,7 +157,7 @@ class SitemapService
         $types = ['articles', 'post', 'news', 'static'];
 
         foreach ($types as $type) {
-            $fileName = "sitemaps/sitemap_{$type}_{$database}.xml";
+            $fileName = "storage/sitemaps/sitemap_{$type}_{$database}.xml";
 
             if (! Storage::disk('frontend_public')->exists($fileName)) {
                 continue;
@@ -172,7 +172,7 @@ class SitemapService
         }
 
         Storage::disk('frontend_public')->put(
-            "sitemaps/sitemap_index_{$database}.xml",
+            "storage/sitemaps/sitemap_index_{$database}.xml",
             $sitemapIndex->render()
         );
     }
