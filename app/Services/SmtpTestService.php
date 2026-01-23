@@ -31,7 +31,7 @@ class SmtpTestService
             // Test SMTP connection
             return $this->performSmtpTest($smtpConfig);
             
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('SMTP Test Service Error: ' . $e->getMessage(), [
                 'config' => $smtpConfig ?? null,
                 'trace' => $e->getTraceAsString()
@@ -161,16 +161,9 @@ class SmtpTestService
                 Log::debug("SMTP Debug Level {$level}: " . trim($str));
             };
             
-            // Test connection
+            // Test connection (SMTP Connect performs authentication if credentials are provided)
             if (!$mail->smtpConnect()) {
                 throw new Exception('SMTP connection failed');
-            }
-            
-            // Test authentication if credentials provided
-            if (!empty($config['username'])) {
-                if (!$mail->authenticate($config['username'], $config['password'])) {
-                    throw new Exception('SMTP authentication failed');
-                }
             }
             
             $mail->smtpClose();

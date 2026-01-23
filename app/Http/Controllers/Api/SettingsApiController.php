@@ -240,11 +240,20 @@ class SettingsApiController extends Controller
     public function testSmtp(Request $request, SmtpTestService $smtp)
     {
         try {
-            // Configure dynamically first if settings provided in request (optional)
-            // But usually we test what's in DB or ENV. 
-            // The original controller uses the service which likely pulls from config.
-            
-            $result = $smtp->testConnection();
+            // If request has SMTP config, use it
+            $config = null;
+            if ($request->has('host')) {
+                $config = [
+                    'host' => $request->input('host'),
+                    'port' => $request->input('port'),
+                    'username' => $request->input('username'),
+                    'password' => $request->input('password'),
+                    'encryption' => $request->input('encryption') ?: null,
+                    'timeout' => 30
+                ];
+            }
+
+            $result = $smtp->testConnection($config);
 
             return (new BaseResource(['result' => $result]))
                 ->response($request)
@@ -267,10 +276,48 @@ class SettingsApiController extends Controller
         ]);
 
         try {
-            // Ensure we are using the latest settings from DB for the test
-            $this->configureMailSettings();
+            // If request has SMTP config, use it to configure mailer dynamically
+            if ($request->has('host')) {
+                $mailConfig = [
+                    'transport' => 'smtp',
+                    'host' => $request->input('host'),
+                    'port' => $request->input('port'),
+                    'encryption' => $request->input('encryption') ?: null,
+                    'username' => $request->input('username'),
+                    'password' => $request->input('password'),
+                    'timeout' => 30,
+                    'local_domain' => env('MAIL_EHLO_DOMAIN', 'alemancenter.com'),
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                ];
 
-            $conn = $smtp->testConnection();
+                config(['mail.mailers.smtp' => $mailConfig]);
+                
+                if ($request->has('from_address')) {
+                    config(['mail.from.address' => $request->input('from_address')]);
+                }
+                if ($request->has('from_name')) {
+                    config(['mail.from.name' => $request->input('from_name')]);
+                }
+            } else {
+                // Otherwise use saved settings from DB
+                $this->configureMailSettings();
+            }
+
+            // Also test connection first with these settings
+            $connConfig = null;
+            if ($request->has('host')) {
+                $connConfig = [
+                    'host' => $request->input('host'),
+                    'port' => $request->input('port'),
+                    'username' => $request->input('username'),
+                    'password' => $request->input('password'),
+                    'encryption' => $request->input('encryption') ?: null,
+                    'timeout' => 30
+                ];
+            }
+            
+            $conn = $smtp->testConnection($connConfig);
             if (!$conn['success']) {
                 return (new BaseResource(['result' => $conn]))
                     ->response($request)

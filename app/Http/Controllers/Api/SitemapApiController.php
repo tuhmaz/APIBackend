@@ -68,10 +68,14 @@ class SitemapApiController extends Controller
      */
     public function generateAll(Request $request)
     {
+        // زيادة الحد الأقصى لوقت التنفيذ
+        set_time_limit(300); // 5 دقائق
+        ini_set('memory_limit', '512M');
+
         try {
             $db = $request->input('database', 'jo');
             Log::info("Starting sitemap generation for database: {$db}");
-            
+
             $connection = $this->getConnection($db);
 
             $this->generateArticles($connection, $db);
@@ -118,27 +122,34 @@ class SitemapApiController extends Controller
         Log::info("Generating articles sitemap for {$db} using connection {$connection}");
         $sitemap = Sitemap::create();
         $count = 0;
+        $frontendBaseUrl = env('FRONTEND_URL', 'https://alemancenter.com');
+        $appUrl = env('APP_URL', 'https://api.alemancenter.com');
+        $defaultImage = $appUrl . '/assets/img/front-pages/icons/articles_default_image.webp';
 
-        Article::on($connection)->get()->each(function ($article) use ($sitemap, $db, &$count) {
-            $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com') . '/' . $db . '/lesson/articles/' . $article->id;
-            $url = Url::create($frontendUrl)
-                ->setLastModificationDate($article->updated_at)
-                ->setChangeFrequency(Url::CHANGE_FREQUENCY_WEEKLY)
-                ->setPriority(0.80);
+        // استخدام chunk لتجنب استهلاك الذاكرة
+        Article::on($connection)
+            ->select(['id', 'title', 'updated_at'])
+            ->chunk(500, function ($articles) use ($sitemap, $db, &$count, $frontendBaseUrl, $defaultImage) {
+                foreach ($articles as $article) {
+                    $frontendUrl = $frontendBaseUrl . '/' . $db . '/lesson/articles/' . $article->id;
+                    $url = Url::create($frontendUrl)
+                        ->setLastModificationDate($article->updated_at)
+                        ->setChangeFrequency(Url::CHANGE_FREQUENCY_WEEKLY)
+                        ->setPriority(0.80);
 
-            // الصورة
-            $image = $article->image_url ?: env('APP_URL', 'https://api.alemancenter.com') . '/assets/img/front-pages/icons/articles_default_image.webp';
-            $url->addImage($image, $article->alt ?? $article->title);
+                    // استخدام الصورة الافتراضية للمقالات
+                    $url->addImage($defaultImage, $article->title);
 
-            $sitemap->add($url);
-            $count++;
-        });
+                    $sitemap->add($url);
+                    $count++;
+                }
+            });
 
         Log::info("Found {$count} articles. Writing to sitemaps/sitemap_articles_{$db}.xml");
 
         Storage::disk('frontend_public')
             ->put("sitemaps/sitemap_articles_{$db}.xml", $sitemap->render());
-            
+
         Log::info("File written: sitemaps/sitemap_articles_{$db}.xml");
     }
 
@@ -147,23 +158,36 @@ class SitemapApiController extends Controller
      */
     private function generatePosts(string $connection, string $db)
     {
+        Log::info("Generating posts sitemap for {$db}");
         $sitemap = Sitemap::create();
+        $count = 0;
+        $frontendBaseUrl = env('FRONTEND_URL', 'https://alemancenter.com');
+        $appUrl = env('APP_URL', 'https://api.alemancenter.com');
+        $defaultImage = $appUrl . '/assets/img/front-pages/icons/articles_default_image.webp';
 
-        Post::on($connection)->get()->each(function ($post) use ($sitemap, $db) {
-            $frontendUrl = env('FRONTEND_URL', 'https://alemancenter.com') . '/' . $db . '/posts/' . $post->id;
-            $url = Url::create($frontendUrl)
-                ->setLastModificationDate($post->updated_at)
-                ->setChangeFrequency(Url::CHANGE_FREQUENCY_DAILY)
-                ->setPriority(0.70);
+        // استخدام chunk لتجنب استهلاك الذاكرة
+        Post::on($connection)
+            ->select(['id', 'title', 'image', 'updated_at'])
+            ->chunk(500, function ($posts) use ($sitemap, $db, &$count, $frontendBaseUrl, $appUrl, $defaultImage) {
+                foreach ($posts as $post) {
+                    $frontendUrl = $frontendBaseUrl . '/' . $db . '/posts/' . $post->id;
+                    $url = Url::create($frontendUrl)
+                        ->setLastModificationDate($post->updated_at)
+                        ->setChangeFrequency(Url::CHANGE_FREQUENCY_DAILY)
+                        ->setPriority(0.70);
 
-            $image = $post->image
-                ? env('APP_URL', 'https://api.alemancenter.com') . Storage::url($post->image)
-                : env('APP_URL', 'https://api.alemancenter.com') . '/assets/img/front-pages/icons/articles_default_image.webp';
+                    $image = $post->image
+                        ? $appUrl . Storage::url($post->image)
+                        : $defaultImage;
 
-            $url->addImage($image, $post->alt ?? $post->title);
+                    $url->addImage($image, $post->title);
 
-            $sitemap->add($url);
-        });
+                    $sitemap->add($url);
+                    $count++;
+                }
+            });
+
+        Log::info("Found {$count} posts. Writing to sitemaps/sitemap_post_{$db}.xml");
 
         Storage::disk('frontend_public')
             ->put("sitemaps/sitemap_post_{$db}.xml", $sitemap->render());
