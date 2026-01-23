@@ -493,9 +493,9 @@ class ArticleApiController extends Controller
                 continue;
             }
 
-            // Construct frontend URL: /{countryCode}/articles/keyword/{keyword}
+            // Construct frontend URL: /{countryCode}/lesson/articles/keyword/{keyword}
             // Note: We are assuming the frontend structure here.
-            $frontendUrl = "/{$database}/articles/keyword/" . urlencode($keywordText);
+            $frontendUrl = "/{$database}/lesson/articles/keyword/" . urlencode($keywordText);
 
             $content = preg_replace(
                 '/\b' . preg_quote($keywordText, '/') . '\b/u',
