@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\SitemapApiController;
 use App\Http\Controllers\Api\UserApiController;
 use App\Http\Controllers\Api\TrustedIpApiController;
 use App\Http\Controllers\Api\SettingsApiController;
+use App\Http\Controllers\Api\AiContentController;
 
 // ========================================================================
 // HEALTH CHECK - No protection needed
@@ -194,6 +195,9 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
         // File uploads
         Route::post('/upload/image', [ImageUploadApiController::class, 'upload']);
         Route::post('/upload/file', [ImageUploadApiController::class, 'uploadFile']);
+
+        // AI Content Generation (shortcut for dashboard editor)
+        Route::post('/ai/generate', [AiContentController::class, 'generate']);
     });
 
     // ==== Dashboard Routes (Authenticated) ====
@@ -225,6 +229,9 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
             Route::delete('/articles/{id}', [ArticleApiController::class, 'destroy'])->whereNumber('id');
             Route::post('/articles/{id}/publish', [ArticleApiController::class, 'publish'])->whereNumber('id');
             Route::post('/articles/{id}/unpublish', [ArticleApiController::class, 'unpublish'])->whereNumber('id');
+            
+            // AI Content Generation
+            Route::post('/ai/generate', [AiContentController::class, 'generate']);
         });
 
         // School Classes Management
