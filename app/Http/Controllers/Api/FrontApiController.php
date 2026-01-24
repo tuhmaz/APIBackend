@@ -88,6 +88,7 @@ class FrontApiController extends Controller
         'meta_keywords',
         'og_image',
         'google_analytics_id',
+        'google_analytics',
 
         // إعدادات عامة أخرى
         'maintenance_mode',
@@ -111,6 +112,16 @@ class FrontApiController extends Controller
             foreach ($this->publicSettings as $key) {
                 if (isset($allSettings[$key])) {
                     $filteredSettings[$key] = $allSettings[$key];
+                }
+            }
+
+            // Fallback to config if not set in DB
+            if (empty($filteredSettings['google_analytics_id'])) {
+                $gaFromConfig = config('settings.google_analytics_id');
+                if (!empty($gaFromConfig)) {
+                    $filteredSettings['google_analytics_id'] = $gaFromConfig;
+                } elseif (!empty($filteredSettings['google_analytics'])) {
+                    $filteredSettings['google_analytics_id'] = $filteredSettings['google_analytics'];
                 }
             }
 
