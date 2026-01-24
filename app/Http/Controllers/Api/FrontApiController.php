@@ -87,6 +87,7 @@ class FrontApiController extends Controller
         'meta_description',
         'meta_keywords',
         'og_image',
+        'google_analytics_id',
 
         // إعدادات عامة أخرى
         'maintenance_mode',
