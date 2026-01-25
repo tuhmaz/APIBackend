@@ -26,7 +26,7 @@ class RouteServiceProvider extends ServiceProvider
     {
         // Define rate limiting for API routes
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            return Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip());
         });
 
         // Define per-user rate limiter so Laravel can resolve "App\\Models\\User::api"
