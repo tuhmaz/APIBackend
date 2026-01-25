@@ -275,6 +275,11 @@ class FrontendApiGuard
      */
     protected function isRateLimited(Request $request): bool
     {
+        // Use dedicated throttle middleware for /api/front/* routes
+        if ($request->is('api/front/*')) {
+            return false;
+        }
+
         $enabled = env('FRONTEND_RATE_LIMIT', true);
         if (!$enabled) {
             return false;

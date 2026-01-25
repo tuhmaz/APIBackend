@@ -26,6 +26,7 @@ use App\Http\Controllers\{
     HomeController,
     NotificationController,
     MonitoringController,
+    Dashboard\Monitoring\VisitorController,
     PerformanceController,
     SecurityLogController,
     SecurityMonitorController,
@@ -328,6 +329,14 @@ Route::middleware(['auth', 'verified'])
         Route::post('/delete-error', [MonitoringController::class, 'deleteErrorLog'])->name('monitoring.delete-error')->middleware(['can:manage monitoring']);
         Route::post('/clear-error-logs', [MonitoringController::class, 'clearErrorLogs'])->name('monitoring.clear-error-logs')->middleware(['can:manage monitoring']);
         Route::delete('/delete-error-log/{id}', [MonitoringController::class, 'deleteErrorLogById'])->name('monitoring.delete-error-log')->middleware(['can:manage monitoring']);
+
+        // Active visitors monitoring
+        Route::get('/visitors', [VisitorController::class, 'index'])->name('monitoring.visitors.index')->middleware(['can:manage monitoring']);
+        Route::get('/visitors/{id}', [VisitorController::class, 'show'])->name('monitoring.visitors.show')->middleware(['can:manage monitoring']);
+        Route::delete('/visitors/{id}', [VisitorController::class, 'destroy'])->name('monitoring.visitors.destroy')->middleware(['can:manage monitoring']);
+        Route::post('/visitors/prune', [VisitorController::class, 'prune'])->name('monitoring.visitors.prune')->middleware(['can:manage monitoring']);
+
+
         
         // مسارات الزوار النشطين تمت إزالتها وتم استبدالها بصفحة تحليلات الزوار
     });

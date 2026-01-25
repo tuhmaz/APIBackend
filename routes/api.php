@@ -125,6 +125,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
 
     // Files (public)
     Route::get('/files/{id}/info', [FileApiController::class, 'info']);
+    Route::post('/files/{id}/increment-view', [FileApiController::class, 'incrementView']);
 
     // Categories
     Route::get('/categories', [CategoryApiController::class, 'index']);
@@ -161,13 +162,16 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
     });
 
     // Front (Settings, Contact, Members)
-    Route::prefix('front')->group(function () {
-        Route::get('/settings', [FrontApiController::class, 'settings']);
-        Route::post('/contact', [FrontApiController::class, 'submitContact']);
-        Route::get('/members', [FrontApiController::class, 'members']);
-        Route::get('/members/{id}', [FrontApiController::class, 'showMember']);
-        Route::post('/members/{id}/contact', [FrontApiController::class, 'contactMember']);
-    });
+    Route::prefix('front')
+        ->middleware('api.throttle:route')
+        ->as('api.front.')
+        ->group(function () {
+            Route::get('/settings', [FrontApiController::class, 'settings'])->name('settings');
+            Route::post('/contact', [FrontApiController::class, 'submitContact'])->name('contact');
+            Route::get('/members', [FrontApiController::class, 'members'])->name('members.index');
+            Route::get('/members/{id}', [FrontApiController::class, 'showMember'])->name('members.show');
+            Route::post('/members/{id}/contact', [FrontApiController::class, 'contactMember'])->name('members.contact');
+        });
 
     // Legal Pages
     Route::prefix('legal')->group(function () {
@@ -215,6 +219,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
         // Analytics (requires permission)
         Route::middleware(['can:manage monitoring'])->group(function () {
             Route::get('/visitor-analytics', [AnalyticsApiController::class, 'index']);
+            Route::post('/visitor-analytics/prune', [AnalyticsApiController::class, 'prune']);
         });
 
         // Articles Management (requires permission)

@@ -16,6 +16,12 @@ return [
     // Debounce VisitorSession log per session/IP (seconds)
     'visitor_session_log_debounce' => (int) env('VISITOR_SESSION_LOG_DEBOUNCE', 30),
 
+    // Active visitor window (minutes) for monitoring dashboard
+    'visitor_active_minutes' => (int) env('VISITOR_ACTIVE_MINUTES', 5),
+
+    // Prune visitor sessions older than this window (minutes)
+    'visitor_prune_minutes' => (int) env('VISITOR_PRUNE_MINUTES', 30),
+
     // Minimum minutes between last_activity updates per user
     'user_last_activity_minutes' => (int) env('USER_LAST_ACTIVITY_MINUTES', 1),
 ];

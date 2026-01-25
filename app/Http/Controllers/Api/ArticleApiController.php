@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class ArticleApiController extends Controller
@@ -411,6 +412,16 @@ class ArticleApiController extends Controller
                 ->setStatusCode(500);
         }
 
+        // Trigger frontend revalidation (best-effort)
+        $this->triggerFrontendRevalidate(
+            $this->buildArticleRevalidatePaths(
+                $connection,
+                $article,
+                $request->input('file_category'),
+                (int) $request->class_id
+            )
+        );
+
         return (new ArticleResource($article->load(['schoolClass', 'subject', 'semester', 'keywords', 'files'])))
             ->response($request)
             ->setStatusCode(201);
@@ -685,6 +696,21 @@ class ArticleApiController extends Controller
             $article->subject_id ? (int) $article->subject_id : null
         );
 
+        $category = $request->input('file_category');
+        if (!$category) {
+            $category = optional($article->files->first())->file_category;
+        }
+
+        // Trigger frontend revalidation (best-effort)
+        $this->triggerFrontendRevalidate(
+            $this->buildArticleRevalidatePaths(
+                $connection,
+                $article,
+                $category,
+                (int) $article->grade_level
+            )
+        );
+
         return new ArticleResource($article->load(['schoolClass', 'subject', 'semester', 'keywords', 'files']));
     }
 
@@ -725,6 +751,8 @@ class ArticleApiController extends Controller
         $connection = $this->getConnection($country);
 
         $article = Article::on($connection)->with('files')->findOrFail($id);
+        $category = optional($article->files->first())->file_category;
+        $classId = (int) $article->grade_level;
 
         // حذف صورة المقال
         $imageName = $article->image;
@@ -749,6 +777,16 @@ class ArticleApiController extends Controller
 
         // Clear cache
         $this->forgetArticleCache($connection, (int)$articleId, $subjectId ? (int)$subjectId : null, null);
+
+        // Trigger frontend revalidation (best-effort)
+        $this->triggerFrontendRevalidate(
+            $this->buildArticleRevalidatePaths(
+                $connection,
+                $article,
+                $category,
+                $classId
+            )
+        );
 
         return new BaseResource([
             'message' => 'تم حذف المقال والصور والملفات المرتبطة به بنجاح.',
@@ -812,6 +850,19 @@ class ArticleApiController extends Controller
             // Clear cache
             $this->forgetArticleCache($connection, (int)$id, $article->subject_id ? (int)$article->subject_id : null, null);
 
+            $article->load('files');
+            $category = optional($article->files->first())->file_category;
+
+            // Trigger frontend revalidation (best-effort)
+            $this->triggerFrontendRevalidate(
+                $this->buildArticleRevalidatePaths(
+                    $connection,
+                    $article,
+                    $category,
+                    (int) $article->grade_level
+                )
+            );
+
             return (new ArticleResource($article))
                 ->additional([
                     'message' => __('Article published successfully'),
@@ -840,6 +891,19 @@ class ArticleApiController extends Controller
 
             // Clear cache
             $this->forgetArticleCache($connection, (int)$id, $article->subject_id ? (int)$article->subject_id : null, null);
+
+            $article->load('files');
+            $category = optional($article->files->first())->file_category;
+
+            // Trigger frontend revalidation (best-effort)
+            $this->triggerFrontendRevalidate(
+                $this->buildArticleRevalidatePaths(
+                    $connection,
+                    $article,
+                    $category,
+                    (int) $article->grade_level
+                )
+            );
 
             return (new ArticleResource($article))
                 ->additional([
@@ -885,7 +949,63 @@ class ArticleApiController extends Controller
 
 
     /**
-     * تخزين مرفق بشكل آمن
+     * Build frontend revalidation paths for an article update.
+     */
+    protected function buildArticleRevalidatePaths(
+        string $countryCode,
+        Article $article,
+        ?string $category = null,
+        ?int $classId = null
+    ): array {
+        $paths = [
+            "/{$countryCode}/lesson",
+            "/{$countryCode}/lesson/articles/{$article->id}",
+        ];
+
+        $resolvedClassId = $classId ?: (int) $article->grade_level;
+        if (!empty($resolvedClassId)) {
+            $paths[] = "/{$countryCode}/lesson/{$resolvedClassId}";
+        }
+
+        if (!empty($article->subject_id)) {
+            $paths[] = "/{$countryCode}/lesson/subjects/{$article->subject_id}";
+
+            if (!empty($article->semester_id) && !empty($category)) {
+                $paths[] = "/{$countryCode}/lesson/subjects/{$article->subject_id}/articles/{$article->semester_id}/{$category}";
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Trigger Next.js on-demand revalidation (best-effort).
+     */
+    protected function triggerFrontendRevalidate(array $paths): void
+    {
+        $frontendUrl = rtrim((string) env('FRONTEND_APP_URL', env('FRONTEND_URL', '')), '/');
+        $secret = env('FRONTEND_REVALIDATE_SECRET', env('REVALIDATE_SECRET'));
+
+        if (!$frontendUrl || !$secret || empty($paths)) {
+            return;
+        }
+
+        try {
+            Http::timeout(2)->post("{$frontendUrl}/api/revalidate", [
+                'secret' => $secret,
+                'paths' => array_values(array_unique($paths)),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Frontend revalidate failed', [
+                'error' => $e->getMessage(),
+                'paths' => $paths,
+            ]);
+        }
+    }
+
+
+    /**
+     * Store attachment securely.
      */
     private function securelyStoreAttachment($file, string $folderPath, ?string $filename = null): array
     {

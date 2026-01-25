@@ -18,6 +18,9 @@ class FileResource extends JsonResource
             'file_size'   => $this->file_size,
             'mime_type'   => $this->mime_type,
             'category'    => $this->file_category,
+            'file_category' => $this->file_category,
+            'download_count' => $this->download_count ?? 0,
+            'views_count' => $this->views_count ?? 0,
         ];
     }
 }

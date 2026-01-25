@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\Article;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -17,9 +18,10 @@ class FileApiController extends Controller
     private function getConnection(string $country): string
     {
         return match ($country) {
-            '2' => 'sa',
-            '3' => 'eg',
-            '4' => 'ps',
+            '1', 'jo', 'jordan' => 'jo',
+            '2', 'sa', 'saudi' => 'sa',
+            '3', 'eg', 'egypt' => 'eg',
+            '4', 'ps', 'palestine' => 'ps',
             default => 'jo',
         };
     }
@@ -151,6 +153,8 @@ class FileApiController extends Controller
                 'file_size' => $file->file_size,
                 'mime_type' => $file->mime_type,
                 'category' => $file->file_category,
+                'download_count' => $file->download_count ?? 0,
+                'views_count' => $file->views_count ?? 0,
             ],
             'type' => null,
             'item' => null,
@@ -190,6 +194,44 @@ class FileApiController extends Controller
         return response()->json([
             'success' => true,
             'data' => $response,
+        ]);
+    }
+
+    /**
+     * POST /api/files/{id}/increment-view
+     * Increment file views_count (deduped per visitor for a short window)
+     */
+    public function incrementView(Request $request, $id)
+    {
+        $databaseParam = (string) $request->input('database', $request->input('country', 'jo'));
+        $database = $this->getConnection($databaseParam);
+
+        $file = File::on($database)->findOrFail($id);
+
+        $viewerId = null;
+        if ($request->hasSession()) {
+            $viewerId = $request->session()->getId();
+        }
+        if (!$viewerId) {
+            $viewerId = $request->cookie('visitor_id') ?: $request->ip();
+        }
+
+        $viewerHash = sha1((string) $viewerId);
+        $cacheKey = "file_viewed:{$database}:{$id}:{$viewerHash}";
+        $ttlMinutes = 30;
+
+        if (Cache::add($cacheKey, 1, now()->addMinutes($ttlMinutes))) {
+            $file->increment('views_count');
+        }
+
+        $file->refresh();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'views_count' => $file->views_count ?? 0,
+                'download_count' => $file->download_count ?? 0,
+            ],
         ]);
     }
 

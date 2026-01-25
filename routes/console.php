@@ -55,3 +55,8 @@ Schedule::command('notifications:prune --days=3 --all')->dailyAt('02:30')->witho
 
 // Activity log cleanup: keep only last 7 days
 Schedule::command('activitylog:clean')->weeklyOn(1, '03:15')->withoutOverlapping();
+
+// Visitor sessions cleanup: remove inactive sessions (default 30 minutes)
+Schedule::command('visitor-sessions:prune --minutes=' . (int) config('monitoring.visitor_prune_minutes', 30))
+    ->everyTenMinutes()
+    ->withoutOverlapping();

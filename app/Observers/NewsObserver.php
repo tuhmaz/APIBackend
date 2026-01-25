@@ -12,9 +12,9 @@ class NewsObserver
      */
     public function created(News $news): void
     {
-        // Dispatch with delay to batch multiple changes
+        // Dispatch after commit to ensure the news item is visible to the job
         GenerateSitemapJob::dispatch($news->getConnectionName(), 'news')
-            ->delay(now()->addMinutes(2));
+            ->afterCommit();
     }
 
     /**
@@ -23,9 +23,9 @@ class NewsObserver
     public function updated(News $news): void
     {
         // Only regenerate sitemap if relevant fields changed
-        if ($news->wasChanged(['title', 'status', 'slug', 'image_url', 'updated_at'])) {
+        if ($news->wasChanged(['title', 'is_active', 'slug', 'image', 'updated_at'])) {
             GenerateSitemapJob::dispatch($news->getConnectionName(), 'news')
-                ->delay(now()->addMinutes(2));
+                ->afterCommit();
         }
     }
 
@@ -35,6 +35,6 @@ class NewsObserver
     public function deleted(News $news): void
     {
         GenerateSitemapJob::dispatch($news->getConnectionName(), 'news')
-            ->delay(now()->addMinutes(2));
+            ->afterCommit();
     }
 }

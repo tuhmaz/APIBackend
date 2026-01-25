@@ -25,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // Global middlewares
         $middleware->use([\Illuminate\Http\Middleware\HandleCors::class]);
+        // Route middleware aliases
+        $middleware->alias([
+            'api.throttle' => ApiRateLimiter::class,
+        ]);
         // API middlewares - Minimal for maximum performance
         $middleware->api([
             SecurityHeaders::class,

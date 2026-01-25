@@ -4,6 +4,9 @@ $frontendPublicPath = env('FRONTEND_PUBLIC_PATH');
 if (!$frontendPublicPath) {
     $base = base_path();
     $candidates = [
+        // Monorepo Next.js frontend (recommended)
+        $base . '/../httpdocs/public',
+        $base . '/../httpdocs/.next/standalone/public',
         // Local monorepo (backend + website/)
         $base . '/../httpdocs/public',
         // Plesk/httpdocs common layouts

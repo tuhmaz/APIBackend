@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Models\Post;
@@ -61,10 +62,11 @@ class PostApiController extends Controller
             $sortBy = 'created_at';
         }
 
-        // Build cache key based on all parameters
+        // Build cache key based on all parameters + version
         $page = $request->get('page', 1);
         $perPage = $request->get('per_page', 10);
-        $cacheKey = "posts_list_{$db}_" . md5(json_encode([
+        $cacheVersion = $this->getPostsListCacheVersion($db);
+        $cacheKey = "posts_list_{$db}_v{$cacheVersion}_" . md5(json_encode([
             'search' => $request->input('search'),
             'category_id' => $request->input('category_id'),
             'sort_by' => $sortBy,
@@ -148,6 +150,12 @@ class PostApiController extends Controller
 
             // Clear cache for this post
             Cache::forget("post_{$db}_{$id}");
+
+            // Bump list cache version and trigger frontend revalidation
+            $this->bumpPostsListCacheVersion($db);
+            $this->triggerFrontendRevalidate(
+                $this->buildPostRevalidatePaths($db, $post)
+            );
 
             return response()->json([
                 'success' => true,
@@ -276,6 +284,12 @@ class PostApiController extends Controller
 
             DB::connection($db)->commit();
 
+            // Bump list cache version and trigger frontend revalidation
+            $this->bumpPostsListCacheVersion($db);
+            $this->triggerFrontendRevalidate(
+                $this->buildPostRevalidatePaths($db, $post)
+            );
+
             return (new PostResource($post))
                 ->additional([
                     'message' => 'Post created successfully',
@@ -399,6 +413,12 @@ class PostApiController extends Controller
 
             DB::connection($db)->commit();
 
+            // Bump list cache version and trigger frontend revalidation
+            $this->bumpPostsListCacheVersion($db);
+            $this->triggerFrontendRevalidate(
+                $this->buildPostRevalidatePaths($db, $post)
+            );
+
             return (new PostResource($post))
                 ->additional([
                     'message' => 'Post updated successfully',
@@ -433,6 +453,13 @@ class PostApiController extends Controller
 
             DB::connection($db)->commit();
 
+            // Clear cache for this post and bump list cache version
+            Cache::forget("post_{$db}_{$id}");
+            $this->bumpPostsListCacheVersion($db);
+            $this->triggerFrontendRevalidate(
+                $this->buildPostRevalidatePaths($db, $post)
+            );
+
             return new BaseResource([
                 'message' => 'Post deleted successfully'
             ]);
@@ -442,6 +469,77 @@ class PostApiController extends Controller
             return (new BaseResource(['message' => 'Failed to delete post', 'error' => $e->getMessage()]))
                 ->response($request)
                 ->setStatusCode(500);
+        }
+    }
+
+    /**
+     * Get posts list cache version for cache key invalidation.
+     */
+    protected function getPostsListCacheVersion(string $db): int
+    {
+        $key = "posts_list_version_{$db}";
+        $version = Cache::get($key);
+        if (!$version) {
+            Cache::forever($key, 1);
+            return 1;
+        }
+
+        return (int) $version;
+    }
+
+    /**
+     * Bump posts list cache version to invalidate all list caches.
+     */
+    protected function bumpPostsListCacheVersion(string $db): void
+    {
+        $key = "posts_list_version_{$db}";
+        if (Cache::has($key)) {
+            Cache::increment($key);
+            return;
+        }
+
+        Cache::forever($key, 2);
+    }
+
+    /**
+     * Build frontend revalidation paths for a post update.
+     */
+    protected function buildPostRevalidatePaths(string $countryCode, Post $post): array
+    {
+        $paths = [
+            "/{$countryCode}/posts",
+            "/{$countryCode}/posts/{$post->id}",
+        ];
+
+        if (!empty($post->category_id)) {
+            $paths[] = "/{$countryCode}/posts/category/{$post->category_id}";
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Trigger Next.js on-demand revalidation (best-effort).
+     */
+    protected function triggerFrontendRevalidate(array $paths): void
+    {
+        $frontendUrl = rtrim((string) env('FRONTEND_APP_URL', env('FRONTEND_URL', '')), '/');
+        $secret = env('FRONTEND_REVALIDATE_SECRET', env('REVALIDATE_SECRET'));
+
+        if (!$frontendUrl || !$secret || empty($paths)) {
+            return;
+        }
+
+        try {
+            Http::timeout(2)->post("{$frontendUrl}/api/revalidate", [
+                'secret' => $secret,
+                'paths' => array_values(array_unique($paths)),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Frontend revalidate failed', [
+                'error' => $e->getMessage(),
+                'paths' => $paths,
+            ]);
         }
     }
 

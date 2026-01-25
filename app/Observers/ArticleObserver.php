@@ -12,9 +12,9 @@ class ArticleObserver
      */
     public function created(Article $article): void
     {
-        // Dispatch with delay to batch multiple changes
+        // Dispatch after commit to ensure the article is visible to the job
         GenerateSitemapJob::dispatch($article->getConnectionName(), 'articles')
-            ->delay(now()->addMinutes(2));
+            ->afterCommit();
     }
 
     /**
@@ -25,7 +25,7 @@ class ArticleObserver
         // Only regenerate sitemap if relevant fields changed
         if ($article->wasChanged(['title', 'status', 'slug', 'image_url', 'updated_at'])) {
             GenerateSitemapJob::dispatch($article->getConnectionName(), 'articles')
-                ->delay(now()->addMinutes(2));
+                ->afterCommit();
         }
     }
 
@@ -35,6 +35,6 @@ class ArticleObserver
     public function deleted(Article $article): void
     {
         GenerateSitemapJob::dispatch($article->getConnectionName(), 'articles')
-            ->delay(now()->addMinutes(2));
+            ->afterCommit();
     }
 }

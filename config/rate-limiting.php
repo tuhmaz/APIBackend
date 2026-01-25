@@ -76,6 +76,13 @@ return [
         // Comments and reactions
         'api.comments.*' => '20,1',             // 20 comments per minute
         'api.reactions.*' => '30,1',            // 30 reactions per minute
+
+        // Front public endpoints (settings/contact/members)
+        'api.front.contact' => '5,10',          // 5 contact submissions per 10 minutes
+        'api.front.members.contact' => '5,10',  // 5 member contact submissions per 10 minutes
+        'api.front.settings' => '120,1',
+        'api.front.members.*' => '120,1',
+        'api.front.*' => '120,1',
     ],
 
     /*

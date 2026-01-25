@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Models\User;
+use Illuminate\Support\Str;
 
 class VisitorSession extends Model
 {
@@ -59,7 +60,13 @@ class VisitorSession extends Model
         $isDesktop = !$isMobile && !$isTablet;
         $isBot = self::isBotUa($ua);
 
-        $sessionId = $request->hasSession() ? $request->session()->getId() : 'ns_' . md5($request->ip() . $request->userAgent());
+        $sessionId = $request->hasSession() ? $request->session()->getId() : null;
+        if (!$sessionId) {
+            $sessionId = $request->attributes->get('visitor_id') ?: $request->cookie('visitor_id');
+        }
+        if (!$sessionId) {
+            $sessionId = 'vid_' . Str::uuid()->toString();
+        }
 
         return self::updateOrCreate(
             ['session_id' => $sessionId],

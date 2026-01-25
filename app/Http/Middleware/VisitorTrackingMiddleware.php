@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class VisitorTrackingMiddleware
 {
@@ -23,6 +24,29 @@ class VisitorTrackingMiddleware
     public function handle(Request $request, Closure $next)
     {
         $response = $next($request);
+
+        // Ensure a stable visitor ID cookie for anonymous traffic (not tied to IP)
+        $visitorId = $request->cookie('visitor_id');
+        if (!$visitorId && !$request->hasSession()) {
+            $visitorId = 'vid_' . Str::uuid()->toString();
+            $minutes = (int) Config::get('session.lifetime', 30);
+            $cookie = cookie(
+                'visitor_id',
+                $visitorId,
+                $minutes,
+                '/',
+                Config::get('session.domain'),
+                (bool) Config::get('session.secure'),
+                true,
+                false,
+                Config::get('session.same_site', 'lax')
+            );
+            $response->headers->setCookie($cookie);
+        }
+
+        if ($visitorId) {
+            $request->attributes->set('visitor_id', $visitorId);
+        }
 
         // Fail fast if disabled
         if (!Config::get('monitoring.visitor_tracking_enabled', true)) {

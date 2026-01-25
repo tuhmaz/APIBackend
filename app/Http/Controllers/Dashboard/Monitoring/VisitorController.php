@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\VisitorSession;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Carbon\Carbon;
 
 class VisitorController extends Controller
@@ -14,7 +15,14 @@ class VisitorController extends Controller
     {
         $timeframe = $request->input('timeframe', 'today');
         $now = now();
-        $activityWindowMinutes = 5; // Default activity window: 5 minutes. This can be made configurable.
+        $activityWindowMinutes = (int) config('monitoring.visitor_active_minutes', 5);
+        $includeBots = $request->boolean('include_bots', false);
+        $perPageParam = $request->input('visitors_per_page', 20);
+        $showAllVisitors = $perPageParam === 'all' || (string) $perPageParam === '0';
+        $perPageVisitors = $showAllVisitors ? null : (int) $perPageParam;
+        if ($perPageVisitors !== null) {
+            $perPageVisitors = max(5, min(100, $perPageVisitors));
+        }
 
         // Determine date range for historical views if needed by other parts of the page
         $startDate = $now->copy()->startOfDay(); // Default to today
@@ -53,10 +61,30 @@ class VisitorController extends Controller
             ->get();
 
         // Paginate for display
-        $paginatedVisitors = $activeVisitorsBaseQuery
+        $paginatedQuery = (clone $activeVisitorsBaseQuery);
+        if (!$includeBots) {
+            $paginatedQuery->humans();
+        }
+
+        $paginatedQuery = $paginatedQuery
             ->orderByRaw('user_id IS NULL')
-            ->orderBy('last_activity', 'desc')
-            ->paginate(15);
+            ->orderBy('last_activity', 'desc');
+
+        if ($showAllVisitors) {
+            $allVisitors = $paginatedQuery->get();
+            $count = $allVisitors->count();
+            $paginatedVisitors = new LengthAwarePaginator(
+                $allVisitors,
+                $count,
+                max(1, $count),
+                1,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+        } else {
+            $paginatedVisitors = $paginatedQuery
+                ->paginate($perPageVisitors)
+                ->withQueryString();
+        }
 
         // Get visitor statistics from the complete collection
         $stats = [
@@ -136,6 +164,8 @@ class VisitorController extends Controller
             'stats' => $stats,
             'locations' => $locations,
             'pages' => $pages,
+            'includeBots' => $includeBots,
+            'visitorsPerPage' => $showAllVisitors ? 'all' : $perPageVisitors,
             'topMembers' => $topMembers,
             'topMembersLatestSessions' => $latestSessions,
             'topMembersSort' => $sort,
@@ -175,5 +205,24 @@ class VisitorController extends Controller
             'success' => true,
             'message' => 'تم حذف جلسة الزائر بنجاح.'
         ]);
+    }
+
+
+    public function prune(Request $request)
+    {
+        $minutes = (int) $request->input('minutes', config('monitoring.visitor_prune_minutes', 30));
+        $minutes = max(1, $minutes);
+        $onlyBots = $request->boolean('only_bots', false);
+
+        $query = VisitorSession::query()->where('last_activity', '<', now()->subMinutes($minutes));
+        if ($onlyBots) {
+            $query->where('is_bot', true);
+        }
+
+        $deleted = $query->delete();
+
+        return redirect()
+            ->back()
+            ->with('success', __('Pruned :count sessions.', ['count' => $deleted]));
     }
 }

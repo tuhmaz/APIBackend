@@ -420,15 +420,36 @@
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <h5 class="mb-0">{{ __('Active Visitor Sessions') }}</h5>
-          <div class="d-flex">
+          <div class="d-flex align-items-center gap-2">
+            <select id="visitorsPerPage" class="form-select form-select-sm" style="width: 140px;">
+              <option value="all" @selected(($visitorsPerPage ?? 20) === 'all')>{{ __('All') }}</option>
+              @foreach([10,20,30,50,100] as $n)
+                <option value="{{ $n }}" @selected(($visitorsPerPage ?? 20) == $n)>{{ $n }} / {{ __('page') }}</option>
+              @endforeach
+            </select>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="includeBots" @checked(($includeBots ?? false))>
+              <label class="form-check-label small" for="includeBots">{{ __('Include Bots') }}</label>
+            </div>
             <div class="input-group input-group-merge">
               <span class="input-group-text"><i class='tabler-search icon-base ti icon-md me-2'></i></span>
               <input type="text" class="form-control" id="searchInput" placeholder="{{ __('Search...') }}">
             </div>
+            <form method="POST" action="{{ route('dashboard.monitoring.visitors.prune') }}" class="d-inline">
+              @csrf
+              <input type="hidden" name="minutes" value="{{ config('monitoring.visitor_prune_minutes', 30) }}">
+              <button type="submit" class="btn btn-sm btn-outline-danger"
+                onclick="return confirm('{{ __('Delete inactive sessions now?') }}')">
+                {{ __('Prune Sessions') }}
+              </button>
+            </form>
             <button class="btn btn-icon btn-outline-primary ms-2" id="refreshBtn">
               <i class='tabler-refresh icon-base ti icon-md me-2'></i>
             </button>
           </div>
+        </div>
+        <div class="px-4 pt-2 text-muted small">
+          {{ __('Showing') }} {{ $visitors->count() }} {{ __('of') }} {{ $visitors->total() }} — {{ __('Total active') }} {{ $stats['total'] }}
         </div>
         <div class="table-responsive text-nowrap">
           <table class="table table-hover">
@@ -708,6 +729,32 @@
       }
       if (perPageSelect) {
         perPageSelect.addEventListener('change', () => updateTopMembersParams({ per_page: perPageSelect.value }));
+      }
+
+      // ---- Visitors controls ----
+      const visitorsPerPage = document.getElementById('visitorsPerPage');
+      const includeBots = document.getElementById('includeBots');
+
+      function updateVisitorsParams(newParams = {}) {
+        const url = new URL(window.location.href);
+        const params = url.searchParams;
+        Object.entries(newParams).forEach(([k, v]) => {
+          if (v === undefined || v === null || v === '') {
+            params.delete(k);
+          } else {
+            params.set(k, v);
+          }
+        });
+        params.delete('page');
+        url.search = params.toString();
+        window.location.assign(url.toString());
+      }
+
+      if (visitorsPerPage) {
+        visitorsPerPage.addEventListener('change', () => updateVisitorsParams({ visitors_per_page: visitorsPerPage.value }));
+      }
+      if (includeBots) {
+        includeBots.addEventListener('change', () => updateVisitorsParams({ include_bots: includeBots.checked ? '1' : '' }));
       }
 
       // Ban IP functionality

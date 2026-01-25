@@ -25,10 +25,11 @@ class AnalyticsApiController extends Controller
      * GET /api/analytics
      * نقطة الدخول الرئيسية للتحليلات
      */
-    public function index()
+    public function index(Request $request)
     {
+        $visitorOptions = $this->parseVisitorOptions($request);
         return new BaseResource([
-            'visitor_stats'   => $this->getVisitorStats(),
+            'visitor_stats'   => $this->getVisitorStats($visitorOptions),
             'user_stats'      => $this->getUserStats(),
             'country_stats'   => $this->getCountryStats(),
             'chart_data'      => $this->getChartData(),
@@ -221,13 +222,13 @@ class AnalyticsApiController extends Controller
     /**
      * إحصائيات الزوار (مع دمج منطق الخدمة)
      */
-    public function getVisitorStats()
+    public function getVisitorStats(array $options = [])
     {
         // إحصائيات الزوار (من الخدمة الأصلية)
         $stats = $this->visitorService->getVisitorStats();
 
         // الزوار النشطين الآن بالتفصيل
-        $activeVisitors = $this->getActiveVisitorsDetailed();
+        $activeVisitors = $this->getActiveVisitorsDetailed($options);
 
         // عدد الأعضاء النشطين الآن
         $currentMembers = Cache::remember('current_members', 300, function () {
@@ -260,43 +261,67 @@ class AnalyticsApiController extends Controller
     /**
      * إرجاع بيانات الزوار النشطين بالتفصيل
      */
-    private function getActiveVisitorsDetailed()
+    private function getActiveVisitorsDetailed(array $options = [])
     {
-        $records = DB::table('visitors_tracking')
-            ->where('last_activity', '>=', now()->subMinutes(5))
-            ->orderBy('last_activity', 'desc')
-            ->limit(20)
-            ->get();
+        $activityWindowMinutes = (int) config('monitoring.visitor_active_minutes', 5);
+        $includeBots = (bool) ($options['include_bots'] ?? false);
+        $perPage = $options['per_page'] ?? 20;
+        $withHistory = (bool) ($options['with_history'] ?? true);
+
+        $recordsQuery = DB::table('visitors_tracking')
+            ->where('last_activity', '>=', now()->subMinutes($activityWindowMinutes))
+            ->orderBy('last_activity', 'desc');
+
+        if (!$includeBots) {
+            $recordsQuery->where(function ($query) {
+                $query->whereNull('os')
+                    ->orWhere('os', '!=', 'Bot');
+            });
+        }
+
+        if ($perPage !== null) {
+            $recordsQuery->limit($perPage);
+        }
+
+        $records = $recordsQuery->get();
+
+        $userIds = $records->pluck('user_id')->filter()->unique()->values();
+        $users = $userIds->isNotEmpty()
+            ? User::whereIn('id', $userIds)->get()->keyBy('id')
+            : collect();
 
         $active = [];
 
         foreach ($records as $v) {
-            $user = $v->user_id ? User::find($v->user_id) : null;
+            $user = $v->user_id ? $users->get($v->user_id) : null;
 
             $page = $v->url ?? '/';
             $pageDisplay = $this->formatPageUrl($page);
 
-            // Fetch recent history for this IP
-            $history = DB::table('visitors_tracking')
-                ->where('ip_address', $v->ip_address)
-                ->orderBy('created_at', 'desc')
-                ->limit(10)
-                ->get()
-                ->map(function($h) {
-                    return [
-                        'url' => $h->url ?? '/',
-                        'time' => $h->created_at,
-                        'device' => ($h->os ?? 'Unknown') . ' - ' . ($h->browser ?? 'Unknown'),
-                        'location' => ($h->country ?? 'Local') . ', ' . ($h->city ?? 'Local'),
-                    ];
-                });
+            $history = collect();
+            if ($withHistory) {
+                // Fetch recent history for this IP
+                $history = DB::table('visitors_tracking')
+                    ->where('ip_address', $v->ip_address)
+                    ->orderBy('created_at', 'desc')
+                    ->limit(10)
+                    ->get()
+                    ->map(function($h) {
+                        return [
+                            'url' => $h->url ?? '/',
+                            'time' => $h->created_at,
+                            'device' => ($h->os ?? 'Unknown') . ' - ' . ($h->browser ?? 'Unknown'),
+                            'location' => ($h->country ?? 'Local') . ', ' . ($h->city ?? 'Local'),
+                        ];
+                    });
+            }
 
             $active[] = [
                 'ip'                => $v->ip_address,
-                'country'           => $v->country ?? 'غير محدد',
-                'city'              => $v->city ?? 'غير محدد',
-                'browser'           => $v->browser ?? 'غير محدد',
-                'os'                => $v->os ?? 'غير محدد',
+                'country'           => $v->country ?? '??? ????',
+                'city'              => $v->city ?? '??? ????',
+                'browser'           => $v->browser ?? '??? ????',
+                'os'                => $v->os ?? '??? ????',
                 'user_agent'        => $v->user_agent ?? '',
                 'current_page'      => $pageDisplay,
                 'current_page_full' => $page,
@@ -408,14 +433,69 @@ class AnalyticsApiController extends Controller
     }
 
     /**
+     * Parse visitor list options from request.
+     */
+    private function parseVisitorOptions(Request $request): array
+    {
+        $perPageParam = $request->input('per_page', 20);
+        $includeBots = $request->boolean('include_bots', true);
+        $withHistory = $request->boolean('with_history', true);
+
+        $perPage = null;
+        if ($perPageParam !== 'all' && (string) $perPageParam !== '0') {
+            $perPage = (int) $perPageParam;
+            if ($perPage <= 0) {
+                $perPage = 20;
+            }
+            $perPage = max(5, min(500, $perPage));
+        }
+
+        return [
+            'per_page' => $perPage,
+            'include_bots' => $includeBots,
+            'with_history' => $withHistory,
+        ];
+    }
+
+    /**
      * GET /api/analytics/visitors
      */
-    public function visitors()
+    public function visitors(Request $request)
     {
+        $visitorOptions = $this->parseVisitorOptions($request);
         return new BaseResource([
-            'visitor_stats' => $this->getVisitorStats(),
+            'visitor_stats' => $this->getVisitorStats($visitorOptions),
             'user_stats'    => $this->getUserStats(),
             'country_stats' => $this->getCountryStats(),
         ]);
     }
+
+    /**
+     * POST /api/dashboard/visitor-analytics/prune
+     */
+    public function prune(Request $request)
+    {
+        $minutes = (int) $request->input('minutes', config('monitoring.visitor_prune_minutes', 30));
+        $minutes = max(1, $minutes);
+        $onlyBots = $request->boolean('only_bots', false);
+
+        $query = VisitorTracking::query()
+            ->where('last_activity', '<', now()->subMinutes($minutes));
+
+        if ($onlyBots) {
+            $query->where('os', 'Bot');
+        }
+
+        $deleted = $query->delete();
+
+        Cache::forget('current_visitors');
+        Cache::forget('total_today_visitors');
+        Cache::forget('visitor_history');
+        Cache::forget('country_stats');
+
+        return new BaseResource([
+            'deleted' => $deleted,
+        ]);
+    }
+
 }
