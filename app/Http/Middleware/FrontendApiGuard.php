@@ -280,6 +280,11 @@ class FrontendApiGuard
             return false;
         }
 
+        // Never rate-limit file downloads (often proxied through SSR and can spike).
+        if ($request->is('api/articles/file/*/download') || $request->is('api/download/*')) {
+            return false;
+        }
+
         $enabled = env('FRONTEND_RATE_LIMIT', true);
         if (!$enabled) {
             return false;
@@ -288,7 +293,7 @@ class FrontendApiGuard
         $maxRequests = (int) env('FRONTEND_RATE_LIMIT_MAX', 100);
         $window = (int) env('FRONTEND_RATE_LIMIT_WINDOW', 60);
 
-        $ip = $request->ip() ?? '0.0.0.0';
+        $ip = $this->getClientIpForRateLimiting($request);
         $key = 'frontend_api_rate:' . sha1($ip);
 
         $bucket = Cache::get($key, ['count' => 0, 'start' => time()]);
@@ -307,6 +312,32 @@ class FrontendApiGuard
     /**
      * تسجيل محاولة وصول غير مصرح بها
      */
+    /**
+     * Resolve a stable client IP for rate limiting (supports common proxy headers).
+     */
+    protected function getClientIpForRateLimiting(Request $request): string
+    {
+        $cf = $request->header('CF-Connecting-IP');
+        if (is_string($cf) && trim($cf) !== '') {
+            return trim($cf);
+        }
+
+        $xff = $request->header('X-Forwarded-For');
+        if (is_string($xff) && trim($xff) !== '') {
+            $first = trim(explode(',', $xff)[0] ?? '');
+            if ($first !== '') {
+                return $first;
+            }
+        }
+
+        $xri = $request->header('X-Real-IP');
+        if (is_string($xri) && trim($xri) !== '') {
+            return trim($xri);
+        }
+
+        return $request->ip() ?? '0.0.0.0';
+    }
+
     protected function logUnauthorizedAccess(Request $request): void
     {
         $logEnabled = env('LOG_UNAUTHORIZED_API_ACCESS', true);
