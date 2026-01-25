@@ -137,7 +137,8 @@ class FileApiController extends Controller
      */
     public function info(Request $request, $id)
     {
-        $database = $request->input('database', 'jo');
+        $databaseParam = $request->input('database', $request->input('country', 'jo'));
+        $database = $this->getConnection((string) $databaseParam);
 
         $file = File::on($database)
             ->with(['article.subject', 'article.schoolClass', 'post.category'])
