@@ -720,21 +720,45 @@ class ArticleApiController extends Controller
     public function download(Request $request, $id)
     {
         try {
-            $countryParam = $request->input('database', $request->input('country_id', $request->input('country', '1')));
+            $countryParam = $request->input(
+                'database',
+                $request->input('countryCode', $request->input('country_id', $request->input('country', '1')))
+            );
             $database     = $this->getConnection($countryParam);
 
             $file = File::on($database)->findOrFail($id);
-            
-            $file->increment('download_count');
 
-            $filePath = storage_path('app/public/' . $file->file_path);
-            
-            if (file_exists($filePath)) {
-                return response()->download($filePath, $file->file_name);
+            $relativePath = ltrim((string) $file->file_path, '/');
+
+            $paths = [];
+            if (Str::startsWith($relativePath, 'storage/')) {
+                $paths[] = public_path($relativePath);
+                $paths[] = storage_path('app/public/' . Str::after($relativePath, 'storage/'));
+            } else {
+                $paths[] = storage_path('app/public/' . $relativePath);
+                $paths[] = public_path('storage/' . $relativePath);
+                $paths[] = public_path($relativePath);
             }
 
-            Log::error("File not found at path: {$filePath} for ID: {$id} on DB: {$database}");
-            return response()->json(['message' => 'File not found on server'], 404);
+            $filePath = null;
+            foreach ($paths as $candidate) {
+                if ($candidate && file_exists($candidate)) {
+                    $filePath = $candidate;
+                    break;
+                }
+            }
+
+            if (!$filePath) {
+                Log::error("File not found for ID: {$id} on DB: {$database}", [
+                    'relative' => $relativePath,
+                    'checked' => $paths,
+                ]);
+                return response()->json(['message' => 'File not found on server'], 404);
+            }
+
+            $file->increment('download_count');
+
+            return response()->download($filePath, $file->file_name);
         } catch (\Throwable $e) {
             Log::error('Error in ArticleApiController@download: ' . $e->getMessage());
             return response()->json(['error' => 'Internal Server Error', 'message' => $e->getMessage()], 500);

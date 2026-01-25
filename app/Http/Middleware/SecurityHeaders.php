@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Config;
+use Symfony\Component\HttpFoundation\Cookie;
 
 class SecurityHeaders
 {
@@ -66,19 +67,23 @@ class SecurityHeaders
             $response->headers->remove('Set-Cookie');
 
             foreach ($cookies as $cookie) {
-                $response->withCookie(
-                    cookie(
-                        $cookie->getName(),
-                        $cookie->getValue(),
-                        $cookie->getExpiresTime(),
-                        $cookie->getPath(),
-                        $cookie->getDomain(),
-                        true, // secure
-                        true, // httpOnly
-                        true, // raw
-                        'strict' // sameSite
-                    )
+                $newCookie = cookie(
+                    $cookie->getName(),
+                    $cookie->getValue(),
+                    $cookie->getExpiresTime(),
+                    $cookie->getPath(),
+                    $cookie->getDomain(),
+                    true, // secure
+                    true, // httpOnly
+                    true, // raw
+                    'strict' // sameSite
                 );
+
+                if (method_exists($response, 'withCookie')) {
+                    $response = $response->withCookie($newCookie);
+                } else {
+                    $response->headers->setCookie($newCookie);
+                }
             }
         }
 

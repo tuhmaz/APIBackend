@@ -126,6 +126,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
     // Files (public)
     Route::get('/files/{id}/info', [FileApiController::class, 'info']);
     Route::post('/files/{id}/increment-view', [FileApiController::class, 'incrementView']);
+    Route::get('/download/{id}', [ArticleApiController::class, 'download'])->whereNumber('id');
 
     // Categories
     Route::get('/categories', [CategoryApiController::class, 'index']);

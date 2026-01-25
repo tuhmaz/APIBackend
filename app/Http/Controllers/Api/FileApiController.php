@@ -242,13 +242,32 @@ class FileApiController extends Controller
      */
     public function download(Request $request, $id)
     {
-        $connection = $this->getConnection($request->country ?? '1');
+        $connection = $this->getConnection(
+            (string) $request->input('database', $request->input('countryCode', $request->input('country', '1')))
+        );
 
         $file = File::on($connection)->findOrFail($id);
 
-        $path = storage_path("app/public/" . $file->file_path);
+        $relativePath = ltrim((string) $file->file_path, '/');
+        $paths = [];
+        if (Str::startsWith($relativePath, 'storage/')) {
+            $paths[] = public_path($relativePath);
+            $paths[] = storage_path('app/public/' . Str::after($relativePath, 'storage/'));
+        } else {
+            $paths[] = storage_path('app/public/' . $relativePath);
+            $paths[] = public_path('storage/' . $relativePath);
+            $paths[] = public_path($relativePath);
+        }
 
-        if (!file_exists($path)) {
+        $path = null;
+        foreach ($paths as $candidate) {
+            if ($candidate && file_exists($candidate)) {
+                $path = $candidate;
+                break;
+            }
+        }
+
+        if (!$path) {
             return (new BaseResource(['message' => 'File not found']))
                 ->response($request)
                 ->setStatusCode(404);
