@@ -280,8 +280,12 @@ class FrontendApiGuard
             return false;
         }
 
-        // Never rate-limit file downloads (often proxied through SSR and can spike).
-        if ($request->is('api/articles/file/*/download') || $request->is('api/download/*')) {
+        // Never rate-limit file downloads/info (often proxied through SSR and can spike).
+        if (
+            $request->is('api/articles/file/*/download') ||
+            $request->is('api/download/*') ||
+            $request->is('api/files/*/info')
+        ) {
             return false;
         }
 
@@ -290,11 +294,25 @@ class FrontendApiGuard
             return false;
         }
 
-        $maxRequests = (int) env('FRONTEND_RATE_LIMIT_MAX', 100);
-        $window = (int) env('FRONTEND_RATE_LIMIT_WINDOW', 60);
-
         $ip = $this->getClientIpForRateLimiting($request);
-        $key = 'frontend_api_rate:' . sha1($ip);
+
+        $isSsr = $this->isServerSideRequest($request);
+
+        // SSR requests typically originate from the Next.js server (single IP) and can spike under load.
+        // Use a separate allowlist + higher limit for SSR only (doesn't affect normal users).
+        if ($isSsr) {
+            if ($this->isSsrIpAllowlisted($ip)) {
+                return false;
+            }
+
+            $maxRequests = (int) env('SSR_RATE_LIMIT_MAX', 2000);
+            $window = (int) env('SSR_RATE_LIMIT_WINDOW', 60);
+            $key = 'frontend_api_rate:ssr:' . sha1($ip);
+        } else {
+            $maxRequests = (int) env('FRONTEND_RATE_LIMIT_MAX', 100);
+            $window = (int) env('FRONTEND_RATE_LIMIT_WINDOW', 60);
+            $key = 'frontend_api_rate:' . sha1($ip);
+        }
 
         $bucket = Cache::get($key, ['count' => 0, 'start' => time()]);
 
@@ -307,6 +325,28 @@ class FrontendApiGuard
         Cache::put($key, $bucket, $window);
 
         return $bucket['count'] > $maxRequests;
+    }
+
+    /**
+     * SSR allowlist (comma-separated IPs; CIDR is not supported here).
+     * Example: SSR_TRUSTED_IPS="152.53.208.71,127.0.0.1"
+     */
+    protected function isSsrIpAllowlisted(string $ip): bool
+    {
+        $raw = (string) env('SSR_TRUSTED_IPS', '');
+        $raw = trim($raw);
+        if ($raw === '' || $ip === '') {
+            return false;
+        }
+
+        $entries = array_filter(array_map('trim', explode(',', $raw)));
+        foreach ($entries as $entry) {
+            if ($entry !== '' && hash_equals($entry, $ip)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
