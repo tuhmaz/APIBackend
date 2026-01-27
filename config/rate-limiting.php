@@ -119,13 +119,15 @@ return [
     | Trusted IPs
     |--------------------------------------------------------------------------
     |
-    | IPs that bypass rate limiting (e.g., monitoring services)
+    | IPs that bypass rate limiting (e.g., SSR servers, monitoring services)
+    | Configure via SSR_TRUSTED_IPS environment variable (comma-separated)
+    | Example: SSR_TRUSTED_IPS="152.53.208.71,127.0.0.1"
     |
     */
-    'trusted_ips' => [
-        // '127.0.0.1',
-        // Add your server monitoring IPs here
-    ],
+    'trusted_ips' => array_filter(array_merge(
+        ['127.0.0.1', '::1'],
+        array_map('trim', explode(',', env('SSR_TRUSTED_IPS', '')))
+    )),
 
     /*
     |--------------------------------------------------------------------------

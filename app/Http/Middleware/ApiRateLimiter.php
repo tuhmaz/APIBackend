@@ -29,6 +29,11 @@ class ApiRateLimiter
             return $next($request);
         }
 
+        // التحقق من القائمة البيضاء (SSR/Trusted IPs) - تجاوز Rate Limiting
+        if ($this->isIpTrusted($request)) {
+            return $next($request);
+        }
+
         // التحقق مما إذا كان عنوان IP محظور بشكل دائم
         if ($this->isIpBlocked($request->ip())) {
             // تسجيل محاولة الوصول من عنوان IP محظور
@@ -192,6 +197,118 @@ class ApiRateLimiter
             ]);
             return false;
         }
+    }
+
+    /**
+     * التحقق مما إذا كان عنوان IP موثوق (يتجاوز Rate Limiting)
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return bool
+     */
+    protected function isIpTrusted(Request $request): bool
+    {
+        $ip = $this->getClientIp($request);
+
+        // 1. التحقق من قائمة IPs الموثوقة في الإعدادات
+        $trustedIps = Config::get('rate-limiting.trusted_ips', []);
+        if (in_array($ip, $trustedIps, true)) {
+            return true;
+        }
+
+        // التحقق من التطابق باستخدام النمط (*)
+        foreach ($trustedIps as $trustedIp) {
+            if (Str::is($trustedIp, $ip)) {
+                return true;
+            }
+        }
+
+        // 2. التحقق من SSR_TRUSTED_IPS من البيئة
+        $ssrTrustedIps = env('SSR_TRUSTED_IPS', '');
+        if ($ssrTrustedIps) {
+            $ssrIps = array_filter(array_map('trim', explode(',', $ssrTrustedIps)));
+            if (in_array($ip, $ssrIps, true)) {
+                return true;
+            }
+        }
+
+        // 3. التحقق من أن الطلب من SSR مع User-Agent موثوق
+        if ($this->isServerSideRequest($request)) {
+            // طلبات SSR من الخادم نفسه (localhost)
+            if (in_array($ip, ['127.0.0.1', '::1'])) {
+                return true;
+            }
+
+            // طلبات SSR من IP موثوق عبر env
+            $trustedServerIps = env('TRUSTED_SERVER_IPS', '');
+            if ($trustedServerIps) {
+                $serverIps = array_filter(array_map('trim', explode(',', $trustedServerIps)));
+                if (in_array($ip, $serverIps, true)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * التحقق من طلبات Server-Side Rendering
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return bool
+     */
+    protected function isServerSideRequest(Request $request): bool
+    {
+        $userAgent = $request->userAgent() ?? '';
+        $xRequestedWith = $request->header('X-Requested-With');
+
+        // Next.js و Node.js server-side request identifiers
+        $serverAgents = ['node-fetch', 'undici', 'node', 'Next.js'];
+
+        foreach ($serverAgents as $agent) {
+            if (stripos($userAgent, $agent) !== false) {
+                return true;
+            }
+        }
+
+        // طلبات بدون Origin header مع X-Requested-With (SSR pattern)
+        if (!$request->header('Origin') && $xRequestedWith === 'XMLHttpRequest') {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * الحصول على IP العميل الحقيقي (يدعم الـ proxies)
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return string
+     */
+    protected function getClientIp(Request $request): string
+    {
+        // Cloudflare
+        $cf = $request->header('CF-Connecting-IP');
+        if (is_string($cf) && trim($cf) !== '') {
+            return trim($cf);
+        }
+
+        // X-Forwarded-For
+        $xff = $request->header('X-Forwarded-For');
+        if (is_string($xff) && trim($xff) !== '') {
+            $first = trim(explode(',', $xff)[0] ?? '');
+            if ($first !== '') {
+                return $first;
+            }
+        }
+
+        // X-Real-IP
+        $xri = $request->header('X-Real-IP');
+        if (is_string($xri) && trim($xri) !== '') {
+            return trim($xri);
+        }
+
+        return $request->ip() ?? '0.0.0.0';
     }
 
     /**

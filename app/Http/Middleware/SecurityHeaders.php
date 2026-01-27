@@ -87,14 +87,9 @@ class SecurityHeaders
             }
         }
 
-        // إضافة رؤوس CORS إذا كان ضرورياً
-        if ($this->shouldAllowCORS($request) || $isMonitoringPage) {
-            $frontendUrl = config('app.frontend_url', '*');
-            $response->headers->set('Access-Control-Allow-Origin', $frontendUrl);
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-            $response->headers->set('Access-Control-Allow-Credentials', 'true');
-        }
+        // ملاحظة: لا تقم بضبط رؤوس CORS هنا.
+        // CORS يتم التعامل معه بشكل مركزي عبر Laravel HandleCors + config/cors.php
+        // ضبطه هنا قد يؤدي لتعارض/تجاوز الإعدادات (خصوصاً Access-Control-Allow-Headers).
 
         // إضافة HSTS (اختياري) في بيئة الإنتاج مع تجنّب الازدواجية (قد يضيفه الخادم/CDN)
         // فعّل عبر APP_ADD_HSTS=true في .env إذا لم يكن الخادم يضيف HSTS

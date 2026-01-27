@@ -20,6 +20,8 @@ class FrontendApiGuard
     protected array $allowedOrigins = [
         'https://alemancenter.com',
         'https://www.alemancenter.com',
+        'https://alemedu.com',
+        'https://www.alemedu.com',
         'http://localhost:3000',
         'http://localhost:3001',
     ];
@@ -30,6 +32,8 @@ class FrontendApiGuard
     protected array $allowedReferers = [
         'alemancenter.com',
         'www.alemancenter.com',
+        'alemedu.com',
+        'www.alemedu.com',
         'localhost:3000',
         'localhost:3001',
     ];
@@ -112,10 +116,18 @@ class FrontendApiGuard
             return true;
         }
 
-        // 5. في بيئة التطوير المحلية فقط، السماح بمرونة أكبر
-        if (app()->environment('local')) {
-            $ip = $request->ip();
-            if (in_array($ip, ['127.0.0.1', '::1']) && $xRequestedWith === 'XMLHttpRequest') {
+        // 5. السماح للطلبات من localhost/السيرفر الداخلي (SSR internal requests)
+        // هذا يسمح لـ Next.js SSR بالاتصال عبر localhost للأداء الأفضل
+        $ip = $request->ip();
+        if (in_array($ip, ['127.0.0.1', '::1']) && $xRequestedWith === 'XMLHttpRequest') {
+            return true;
+        }
+
+        // 5.1 السماح للـ IPs الموثوقة من السيرفر
+        $trustedServerIps = env('TRUSTED_SERVER_IPS', '');
+        if ($trustedServerIps && $xRequestedWith === 'XMLHttpRequest') {
+            $serverIps = array_filter(array_map('trim', explode(',', $trustedServerIps)));
+            if (in_array($ip, $serverIps, true)) {
                 return true;
             }
         }

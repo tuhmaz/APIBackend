@@ -3,25 +3,22 @@
 $frontendPublicPath = env('FRONTEND_PUBLIC_PATH');
 if (!$frontendPublicPath) {
     $base = base_path();
+    // In some hosting environments (e.g. Plesk), open_basedir may restrict filesystem access.
+    // Avoid probing paths outside the vhost root to prevent noisy warnings in logs.
+    $vhostRoot = @realpath(dirname($base)) ?: dirname($base);
     $candidates = [
         // Monorepo Next.js frontend (recommended)
         $base . '/../httpdocs/public',
         $base . '/../httpdocs/.next/standalone/public',
-        // Local monorepo (backend + website/)
-        $base . '/../httpdocs/public',
-        // Plesk/httpdocs common layouts
+        // Common layouts within the same vhost root
         $base . '/../public',
-        $base . '/../httpdocs/public',
-        $base . '/../../httpdocs/public',
-        dirname($base) . '/public',
-        dirname($base, 2) . '/public',
-        dirname($base, 2) . '/httpdocs/public',
-        dirname($base, 3) . '/httpdocs/public',
+        $vhostRoot . '/httpdocs/public',
+        $vhostRoot . '/httpdocs/.next/standalone/public',
     ];
 
     foreach ($candidates as $candidate) {
-        $resolved = realpath($candidate) ?: $candidate;
-        if (is_dir($resolved)) {
+        $resolved = @realpath($candidate) ?: $candidate;
+        if (is_string($resolved) && $resolved !== '' && @is_dir($resolved)) {
             $frontendPublicPath = $resolved;
             break;
         }
