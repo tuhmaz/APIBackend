@@ -11,33 +11,14 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Frontend API Guard
  * حماية API من الوصول المباشر - السماح فقط للفرونت إند
+ *
+ * Configuration via .env:
+ * - CORS_ALLOWED_ORIGINS: comma-separated list of allowed origins (https://example.com,https://www.example.com)
+ * - FRONTEND_URL: main frontend URL
+ * - APP_URL: API URL
  */
 class FrontendApiGuard
 {
-    /**
-     * النطاقات المسموح بها للـ Origin
-     */
-    protected array $allowedOrigins = [
-        'https://alemancenter.com',
-        'https://www.alemancenter.com',
-        'https://alemedu.com',
-        'https://www.alemedu.com',
-        'http://localhost:3000',
-        'http://localhost:3001',
-    ];
-
-    /**
-     * النطاقات المسموح بها للـ Referer
-     */
-    protected array $allowedReferers = [
-        'alemancenter.com',
-        'www.alemancenter.com',
-        'alemedu.com',
-        'www.alemedu.com',
-        'localhost:3000',
-        'localhost:3001',
-    ];
-
     /**
      * المسارات المستثناة من الحماية (مثل webhooks)
      */
@@ -46,6 +27,100 @@ class FrontendApiGuard
         'api/auth/email/verify',
         'api/ping',
     ];
+
+    /**
+     * الحصول على النطاقات المسموح بها للـ Origin من البيئة
+     */
+    protected function getAllowedOrigins(): array
+    {
+        // Default localhost origins for development
+        $origins = [
+            'http://localhost:3000',
+            'http://localhost:3001',
+        ];
+
+        // Add from CORS_ALLOWED_ORIGINS env (comma-separated)
+        // This is the single source of truth for allowed origins
+        $corsOrigins = env('CORS_ALLOWED_ORIGINS', '');
+        if ($corsOrigins && $corsOrigins !== '*') {
+            $origins = array_merge($origins, array_filter(array_map('trim', explode(',', $corsOrigins))));
+        }
+
+        // Add FRONTEND_URL if set (auto-add www variant)
+        $frontendUrl = env('FRONTEND_URL');
+        if ($frontendUrl) {
+            $origins[] = $frontendUrl;
+            $parsed = parse_url($frontendUrl);
+            if (isset($parsed['host']) && !str_starts_with($parsed['host'], 'www.')) {
+                $origins[] = ($parsed['scheme'] ?? 'https') . '://www.' . $parsed['host'];
+            }
+        }
+
+        return array_unique(array_filter($origins));
+    }
+
+    /**
+     * الحصول على النطاقات المسموح بها للـ Referer من البيئة
+     */
+    protected function getAllowedReferers(): array
+    {
+        $referers = [
+            'localhost:3000',
+            'localhost:3001',
+        ];
+
+        // Extract hosts from allowed origins
+        foreach ($this->getAllowedOrigins() as $origin) {
+            $parsed = parse_url($origin);
+            if (isset($parsed['host'])) {
+                $host = $parsed['host'];
+                $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+                $referers[] = $host . $port;
+            }
+        }
+
+        return array_unique(array_filter($referers));
+    }
+
+    /**
+     * الحصول على الـ Hosts المسموح بها من البيئة
+     */
+    protected function getAllowedHosts(): array
+    {
+        $hosts = ['localhost'];
+
+        // Add from APP_URL
+        $appUrl = env('APP_URL');
+        if ($appUrl) {
+            $parsed = parse_url($appUrl);
+            if (isset($parsed['host'])) {
+                $hosts[] = $parsed['host'];
+            }
+        }
+
+        // Add from FRONTEND_URL
+        $frontendUrl = env('FRONTEND_URL');
+        if ($frontendUrl) {
+            $parsed = parse_url($frontendUrl);
+            if (isset($parsed['host'])) {
+                $hosts[] = $parsed['host'];
+                // Add www variant
+                if (!str_starts_with($parsed['host'], 'www.')) {
+                    $hosts[] = 'www.' . $parsed['host'];
+                }
+            }
+        }
+
+        // Add hosts from allowed origins
+        foreach ($this->getAllowedOrigins() as $origin) {
+            $parsed = parse_url($origin);
+            if (isset($parsed['host'])) {
+                $hosts[] = $parsed['host'];
+            }
+        }
+
+        return array_unique(array_filter($hosts));
+    }
 
     /**
      * Handle an incoming request.
@@ -203,14 +278,7 @@ class FrontendApiGuard
      */
     protected function isAllowedOrigin(string $origin): bool
     {
-        // إضافة النطاقات من البيئة
-        $envOrigins = env('ALLOWED_ORIGINS', '');
-        if ($envOrigins) {
-            $additional = array_filter(array_map('trim', explode(',', $envOrigins)));
-            $this->allowedOrigins = array_merge($this->allowedOrigins, $additional);
-        }
-
-        return in_array($origin, $this->allowedOrigins, true);
+        return in_array($origin, $this->getAllowedOrigins(), true);
     }
 
     /**
@@ -223,7 +291,7 @@ class FrontendApiGuard
         $port = isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '';
         $fullHost = $host . $port;
 
-        foreach ($this->allowedReferers as $allowed) {
+        foreach ($this->getAllowedReferers() as $allowed) {
             if ($fullHost === $allowed || str_ends_with($fullHost, '.' . $allowed)) {
                 return true;
             }
@@ -237,12 +305,7 @@ class FrontendApiGuard
      */
     protected function isAllowedHost(string $host): bool
     {
-        $allowedHosts = [
-            'api.alemancenter.com',
-            'alemancenter.com',
-            'www.alemancenter.com',
-            'localhost',
-        ];
+        $allowedHosts = $this->getAllowedHosts();
 
         foreach ($allowedHosts as $allowed) {
             if ($host === $allowed || str_starts_with($host, $allowed . ':')) {

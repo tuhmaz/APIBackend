@@ -30,13 +30,26 @@ return [
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['*'],
+    // Explicitly list allowed headers (don't use '*' with credentials)
+    'allowed_headers' => [
+        'Content-Type',
+        'Authorization',
+        'Accept',
+        'Origin',
+        'X-Requested-With',
+        'X-CSRF-TOKEN',
+        'X-API-KEY',
+        'X-Frontend-Key',
+        'X-App-Locale',
+        'X-Country-Id',
+        'X-Country-Code',
+    ],
 
     // Headers your client may read in responses
     'exposed_headers' => ['Authorization', 'X-CSRF-TOKEN'],
 
-    'max_age' => 0,
+    'max_age' => 86400, // Cache preflight for 24 hours
 
-    // If using Sanctum with SPA cookie auth, set to true and DO NOT use * in allowed_origins
-    'supports_credentials' => filter_var(env('CORS_SUPPORTS_CREDENTIALS', false), FILTER_VALIDATE_BOOLEAN),
+    // Required for Sanctum cookie auth and frontend with credentials
+    'supports_credentials' => true,
 ];

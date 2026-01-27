@@ -8,24 +8,36 @@ use Illuminate\Http\Request;
 class Cors
 {
     /**
-     * Allowed origins for CORS
-     * Production: Only alemancenter.com domains
-     * Development: localhost for testing
+     * Get allowed origins from environment variable
+     * Configure via CORS_ALLOWED_ORIGINS in .env (comma-separated)
      */
-    protected $allowedOrigins = [
-        'https://alemancenter.com',
-        'https://www.alemancenter.com',
-        'http://localhost:3000',  // Development only
-        'http://localhost:3001',  // Development only
-    ];
+    protected function getAllowedOrigins(): array
+    {
+        // Default origins (always allowed)
+        $defaults = [
+            'http://localhost:3000',  // Development
+            'http://localhost:3001',  // Development
+        ];
+
+        // Get origins from .env
+        $envOrigins = env('CORS_ALLOWED_ORIGINS', '');
+        if ($envOrigins) {
+            $origins = array_filter(array_map('trim', explode(',', $envOrigins)));
+            return array_merge($defaults, $origins);
+        }
+
+        // Fallback to defaults
+        return $defaults;
+    }
 
     public function handle(Request $request, Closure $next)
     {
         $origin = $request->headers->get('Origin');
+        $allowedOrigins = $this->getAllowedOrigins();
 
         // Check if origin is allowed
         $allowedOrigin = null;
-        if ($origin && in_array($origin, $this->allowedOrigins)) {
+        if ($origin && in_array($origin, $allowedOrigins)) {
             $allowedOrigin = $origin;
         }
 
