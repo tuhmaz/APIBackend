@@ -30,12 +30,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'api.throttle' => ApiRateLimiter::class,
         ]);
-        // API middlewares - Minimal for maximum performance
+        // API middlewares - Only essential ones for local development
+        // Heavy middlewares (UpdateUserLastActivity, VisitorTracking) disabled for speed
+        // Enable them in production by uncommenting
         $middleware->api([
             SecurityHeaders::class,
-            UpdateUserLastActivity::class,
-            // ApiRateLimiter::class,
-            VisitorTrackingMiddleware::class,
+            // Disabled for local dev - requires Redis and slows down requests
+            // UpdateUserLastActivity::class,
+            // VisitorTrackingMiddleware::class,
         ]);
         // Web middlewares - Optimized for performance
         $middleware->web([
