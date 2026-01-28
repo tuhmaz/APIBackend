@@ -14,6 +14,7 @@ use App\Http\Middleware\SecurityScanMiddleware;
 use App\Http\Middleware\StripContentEncodingHeader;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\ApiRateLimiter;
+use App\Http\Middleware\CorsMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,8 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
       health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Global middlewares
-        $middleware->use([\Illuminate\Http\Middleware\HandleCors::class]);
+        // Global middlewares - Custom CORS that reads directly from env (no cache issues)
+        $middleware->use([CorsMiddleware::class]);
         // Route middleware aliases
         $middleware->alias([
             'api.throttle' => ApiRateLimiter::class,
