@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
+use App\Services\DatabaseManager;
 
 /**
  * Frontend API Guard
@@ -16,6 +17,8 @@ use Symfony\Component\HttpFoundation\Response;
  * - CORS_ALLOWED_ORIGINS: comma-separated list of allowed origins (https://example.com,https://www.example.com)
  * - FRONTEND_URL: main frontend URL
  * - APP_URL: API URL
+ *
+ * OPTIMIZED: Caches allowed origins/referers to avoid recalculating on every request
  */
 class FrontendApiGuard
 {
@@ -26,17 +29,36 @@ class FrontendApiGuard
         'api/auth/google/callback',
         'api/auth/email/verify',
         'api/ping',
+        'api/health',
+        'api/public/*',
     ];
 
     /**
+     * Cached allowed origins (computed once per request)
+     */
+    private static ?array $cachedOrigins = null;
+
+    /**
+     * Cached allowed referers (computed once per request)
+     */
+    private static ?array $cachedReferers = null;
+
+    /**
      * الحصول على النطاقات المسموح بها للـ Origin من البيئة
+     * OPTIMIZED: Results are cached for the request lifecycle
      */
     protected function getAllowedOrigins(): array
     {
+        // Return cached if available
+        if (self::$cachedOrigins !== null) {
+            return self::$cachedOrigins;
+        }
+
         // Default localhost origins for development
         $origins = [
             'http://localhost:3000',
             'http://localhost:3001',
+            'http://127.0.0.1:3000',
         ];
 
         // Add from CORS_ALLOWED_ORIGINS env (comma-separated)
@@ -56,17 +78,25 @@ class FrontendApiGuard
             }
         }
 
-        return array_unique(array_filter($origins));
+        self::$cachedOrigins = array_unique(array_filter($origins));
+        return self::$cachedOrigins;
     }
 
     /**
      * الحصول على النطاقات المسموح بها للـ Referer من البيئة
+     * OPTIMIZED: Results are cached for the request lifecycle
      */
     protected function getAllowedReferers(): array
     {
+        // Return cached if available
+        if (self::$cachedReferers !== null) {
+            return self::$cachedReferers;
+        }
+
         $referers = [
             'localhost:3000',
             'localhost:3001',
+            '127.0.0.1:3000',
         ];
 
         // Extract hosts from allowed origins
@@ -79,7 +109,8 @@ class FrontendApiGuard
             }
         }
 
-        return array_unique(array_filter($referers));
+        self::$cachedReferers = array_unique(array_filter($referers));
+        return self::$cachedReferers;
     }
 
     /**
@@ -156,6 +187,10 @@ class FrontendApiGuard
                 'code' => 'RATE_LIMIT_EXCEEDED'
             ], 429);
         }
+
+        // Set database connection based on country header
+        // This centralizes connection switching for all API requests
+        DatabaseManager::setConnection($request->header('X-Country-Id'));
 
         return $next($request);
     }

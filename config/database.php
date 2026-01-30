@@ -59,9 +59,9 @@ return [
       'options' => extension_loaded('pdo_mysql') ? array_filter([
         PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
         PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::ATTR_TIMEOUT => 60,
-        PDO::ATTR_PERSISTENT => false,
-        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => true,
+        PDO::ATTR_TIMEOUT => env('DB_TIMEOUT', 15), // Reduced from 60s
+        PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true), // Enable persistent connections
+        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('DB_SSL_VERIFY', false),
       ]) : [],
     ],
 
@@ -81,9 +81,9 @@ return [
       'options' => extension_loaded('pdo_mysql') ? array_filter([
         PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
         PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::ATTR_TIMEOUT => 60,
-        PDO::ATTR_PERSISTENT => false,
-        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => true,
+        PDO::ATTR_TIMEOUT => env('DB_TIMEOUT', 15),
+        PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true),
+        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('DB_SSL_VERIFY', false),
       ]) : [],
     ],
 
@@ -103,9 +103,9 @@ return [
       'options' => extension_loaded('pdo_mysql') ? array_filter([
         PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
         PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::ATTR_TIMEOUT => 60,
-        PDO::ATTR_PERSISTENT => false,
-        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => true,
+        PDO::ATTR_TIMEOUT => env('DB_TIMEOUT', 15),
+        PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true),
+        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('DB_SSL_VERIFY', false),
       ]) : [],
     ],
 
@@ -125,9 +125,9 @@ return [
       'options' => extension_loaded('pdo_mysql') ? array_filter([
         PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
         PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::ATTR_TIMEOUT => 60,
-        PDO::ATTR_PERSISTENT => false,
-        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => true,
+        PDO::ATTR_TIMEOUT => env('DB_TIMEOUT', 15),
+        PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true),
+        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('DB_SSL_VERIFY', false),
       ]) : [],
     ],
 

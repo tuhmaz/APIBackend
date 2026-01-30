@@ -13,20 +13,29 @@ use App\Models\SchoolClass;
 use App\Models\Category;
 use App\Models\News;
 use App\Http\Resources\BaseResource;
+use App\Services\DatabaseManager;
 
 class HomeApiController extends Controller
 {
     /**
      * Helper to get database connection
+     * Uses centralized DatabaseManager
      */
     private function getDatabase(Request $request): string
     {
+        // Use header-based country detection first, fallback to query param
+        $countryId = $request->header('X-Country-Id');
+        if ($countryId) {
+            return DatabaseManager::getConnection($countryId);
+        }
+
         return $request->query('database', session('database', 'jo'));
     }
 
     /**
      * GET /api/home
      * الصفحة الرئيسية عبر API — تقويم + فئات + صفوف + أخبار
+     * OPTIMIZED: Single query for all month events instead of 31 queries
      */
     public function index(Request $request)
     {
@@ -37,62 +46,90 @@ class HomeApiController extends Controller
         $currentMonth = $today->month;
         $currentYear = $today->year;
 
-        // إعداد التقويم
-        $firstDay = Carbon::create($currentYear, $currentMonth, 1);
-        $daysInMonth = $firstDay->daysInMonth;
+        // Cache key for this request
+        $cacheKey = "home_data_{$db}_{$currentYear}_{$currentMonth}";
 
-        $calendar = [];
+        // Try to get from cache (5 minutes)
+        $homeData = Cache::remember($cacheKey, 300, function () use ($db, $today, $currentMonth, $currentYear) {
+            // إعداد التقويم
+            $firstDay = Carbon::create($currentYear, $currentMonth, 1);
+            $daysInMonth = $firstDay->daysInMonth;
 
-        // days of previous month
-        $prevMonth = $firstDay->copy()->subMonth();
-        $prevMonthDays = $prevMonth->daysInMonth;
-        $firstDayOfWeek = $firstDay->dayOfWeek;
+            // OPTIMIZATION: Fetch ALL events for the month in ONE query
+            $monthStart = $firstDay->copy()->startOfMonth();
+            $monthEnd = $firstDay->copy()->endOfMonth();
 
-        for ($i = $firstDayOfWeek - 1; $i >= 0; $i--) {
-            $date = $prevMonth->format('Y-m-') . sprintf('%02d', $prevMonthDays - $i);
-            $calendar[$date] = [];
-        }
-
-        // current month days
-        for ($day = 1; $day <= $daysInMonth; $day++) {
-            $date = $today->format('Y-m-') . sprintf('%02d', $day);
-
-            $events = Event::on($db)
-                ->whereDate('event_date', $date)
+            $allEvents = Event::on($db)
+                ->whereBetween('event_date', [$monthStart, $monthEnd])
                 ->get()
-                ->map(fn($e) => [
+                ->groupBy(fn($e) => Carbon::parse($e->event_date)->format('Y-m-d'))
+                ->map(fn($events) => $events->map(fn($e) => [
                     'id' => $e->id,
                     'title' => $e->title,
                     'description' => $e->description,
                     'date' => $e->event_date,
-                ]);
+                ]));
 
-            $calendar[$date] = $events;
-        }
+            $calendar = [];
 
-        // next month days
-        $lastDayOfMonth = Carbon::create($currentYear, $currentMonth, $daysInMonth)->dayOfWeek;
-        $toAdd = 6 - $lastDayOfMonth;
-        $nextMonth = $firstDay->copy()->addMonth();
+            // days of previous month
+            $prevMonth = $firstDay->copy()->subMonth();
+            $prevMonthDays = $prevMonth->daysInMonth;
+            $firstDayOfWeek = $firstDay->dayOfWeek;
 
-        for ($i = 1; $i <= $toAdd; $i++) {
-            $date = $nextMonth->format('Y-m-') . sprintf('%02d', $i);
-            $calendar[$date] = [];
-        }
+            for ($i = $firstDayOfWeek - 1; $i >= 0; $i--) {
+                $date = $prevMonth->format('Y-m-') . sprintf('%02d', $prevMonthDays - $i);
+                $calendar[$date] = [];
+            }
 
-        // جلب البيانات الأخرى
-        $classes = SchoolClass::on($db)->get();
-        $categories = Category::on($db)->orderBy('id')->get();
-        $news = News::on($db)->with('category')->latest()->get();
+            // current month days - use pre-fetched events
+            for ($day = 1; $day <= $daysInMonth; $day++) {
+                $date = $today->format('Y-m-') . sprintf('%02d', $day);
+                $calendar[$date] = $allEvents->get($date, collect())->toArray();
+            }
+
+            // next month days
+            $lastDayOfMonth = Carbon::create($currentYear, $currentMonth, $daysInMonth)->dayOfWeek;
+            $toAdd = 6 - $lastDayOfMonth;
+            $nextMonth = $firstDay->copy()->addMonth();
+
+            for ($i = 1; $i <= $toAdd; $i++) {
+                $date = $nextMonth->format('Y-m-') . sprintf('%02d', $i);
+                $calendar[$date] = [];
+            }
+
+            // جلب البيانات الأخرى with eager loading
+            $classes = SchoolClass::on($db)
+                ->with(['subjects', 'semesters']) // Eager load relationships
+                ->get();
+
+            $categories = Category::on($db)
+                ->with(['children', 'parent']) // Eager load relationships
+                ->orderBy('id')
+                ->get();
+
+            $news = News::on($db)
+                ->with('category')
+                ->latest()
+                ->limit(10) // Limit news for performance
+                ->get();
+
+            return [
+                'calendar' => $calendar,
+                'classes' => $classes,
+                'categories' => $categories,
+                'news' => $news,
+            ];
+        });
 
         return new BaseResource([
             'current_month' => $currentMonth,
             'current_year' => $currentYear,
             'database' => $db,
-            'calendar' => $calendar,
-            'classes' => $classes,
-            'categories' => $categories,
-            'news' => $news,
+            'calendar' => $homeData['calendar'],
+            'classes' => $homeData['classes'],
+            'categories' => $homeData['categories'],
+            'news' => $homeData['news'],
             'icons' => $this->icons(),
             'user' => Auth::check() ? Auth::user() : null
         ]);

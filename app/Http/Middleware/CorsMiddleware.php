@@ -9,8 +9,13 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * CORS Middleware - Handles Cross-Origin Resource Sharing
  *
- * This middleware handles CORS without relying on config cache.
- * It reads allowed origins directly from environment variables.
+ * IMPORTANT: This middleware MUST be the first in the chain.
+ * It handles OPTIONS preflight requests IMMEDIATELY without passing to other middlewares.
+ * This prevents auth/guard middlewares from blocking preflight requests.
+ *
+ * Configuration via .env:
+ * - CORS_ALLOWED_ORIGINS: comma-separated list of allowed origins
+ * - FRONTEND_URL: automatically added to allowed origins
  */
 class CorsMiddleware
 {
@@ -22,7 +27,7 @@ class CorsMiddleware
     ];
 
     /**
-     * Allowed headers
+     * Allowed headers - Include ALL custom headers your frontend sends
      */
     protected array $allowedHeaders = [
         'Content-Type',
@@ -33,9 +38,12 @@ class CorsMiddleware
         'X-CSRF-TOKEN',
         'X-API-KEY',
         'X-Frontend-Key',
+        'X-Frontend-Api-Key',
         'X-App-Locale',
         'X-Country-Id',
         'X-Country-Code',
+        'Cache-Control',
+        'Pragma',
     ];
 
     /**
@@ -44,10 +52,14 @@ class CorsMiddleware
     protected array $exposedHeaders = [
         'Authorization',
         'X-CSRF-TOKEN',
+        'Content-Disposition',
     ];
 
     /**
      * Handle an incoming request.
+     *
+     * CRITICAL: OPTIONS requests are handled immediately and returned.
+     * They NEVER pass through to other middlewares or controllers.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -57,12 +69,13 @@ class CorsMiddleware
         // Check if this origin is allowed
         $allowedOrigin = $this->getAllowedOrigin($origin);
 
-        // Handle preflight OPTIONS request
+        // Handle preflight OPTIONS request IMMEDIATELY
+        // Do NOT pass to $next - this prevents other middlewares from blocking it
         if ($request->isMethod('OPTIONS')) {
-            return $this->handlePreflightRequest($allowedOrigin);
+            return $this->handlePreflightRequest($origin, $allowedOrigin);
         }
 
-        // Process the request
+        // Process the actual request
         $response = $next($request);
 
         // Add CORS headers to the response
@@ -129,18 +142,29 @@ class CorsMiddleware
 
     /**
      * Handle preflight OPTIONS request
+     *
+     * IMPORTANT: Always return headers even if origin is not allowed.
+     * This helps with debugging and doesn't expose security issues
+     * (the actual request will still be blocked if origin is invalid).
      */
-    protected function handlePreflightRequest(?string $allowedOrigin): Response
+    protected function handlePreflightRequest(?string $requestOrigin, ?string $allowedOrigin): Response
     {
-        $response = response('', 204);
+        $response = response()->noContent(204);
 
+        // If origin is allowed, set it. Otherwise, don't set Access-Control-Allow-Origin
+        // (browser will block the request, but we still send other headers for debugging)
         if ($allowedOrigin) {
             $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
-            $response->headers->set('Access-Control-Allow-Methods', implode(', ', $this->allowedMethods));
-            $response->headers->set('Access-Control-Allow-Headers', implode(', ', $this->allowedHeaders));
             $response->headers->set('Access-Control-Allow-Credentials', 'true');
-            $response->headers->set('Access-Control-Max-Age', '86400');
         }
+
+        // Always send these headers for preflight
+        $response->headers->set('Access-Control-Allow-Methods', implode(', ', $this->allowedMethods));
+        $response->headers->set('Access-Control-Allow-Headers', implode(', ', $this->allowedHeaders));
+        $response->headers->set('Access-Control-Max-Age', '86400'); // 24 hours
+
+        // Vary header is important for caching
+        $response->headers->set('Vary', 'Origin, Access-Control-Request-Headers');
 
         return $response;
     }
@@ -158,6 +182,9 @@ class CorsMiddleware
                 $response->headers->set('Access-Control-Expose-Headers', implode(', ', $this->exposedHeaders));
             }
         }
+
+        // Vary header is important for proper caching
+        $response->headers->set('Vary', 'Origin');
 
         return $response;
     }
