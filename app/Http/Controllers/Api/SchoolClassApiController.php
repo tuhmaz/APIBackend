@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use App\Http\Resources\Api\SchoolClassResource;
 use App\Http\Resources\BaseResource;
+use App\Services\DatabaseManager;
 
 class SchoolClassApiController extends Controller
 {
@@ -24,11 +25,66 @@ class SchoolClassApiController extends Controller
     ];
 
     /**
-     * تحديد الاتصال المناسب
+     * Country codes to IDs mapping
      */
-    private function connection(string $countryId): string
+    private array $countryCodes = [
+        'jo' => '1',
+        'sa' => '2',
+        'eg' => '3',
+        'ps' => '4',
+    ];
+
+    /**
+     * تحديد الاتصال المناسب
+     * يقرأ من: query param -> header -> default
+     */
+    private function connection(Request $request): string
     {
+        // 1. Try query parameter first
+        $countryId = $request->query('country_id');
+
+        // 2. Try X-Country-Id header (from SSR requests)
+        if (!$countryId) {
+            $countryId = $request->header('X-Country-Id');
+        }
+
+        // 3. Try database query param (country code like 'jo', 'sa')
+        if (!$countryId) {
+            $database = $request->query('database');
+            if ($database && isset($this->countryCodes[$database])) {
+                return $database; // Return the connection name directly
+            }
+        }
+
+        // 4. Try X-Country-Code header
+        if (!$countryId) {
+            $countryCode = $request->header('X-Country-Code');
+            if ($countryCode && isset($this->countryCodes[$countryCode])) {
+                return $countryCode; // Return the connection name directly
+            }
+        }
+
+        // 5. Default to Jordan
+        $countryId = $countryId ?: '1';
+
         return $this->countries[$countryId] ?? 'jo';
+    }
+
+    /**
+     * Get country ID from request (for response)
+     */
+    private function getCountryId(Request $request): string
+    {
+        $countryId = $request->query('country_id') ?? $request->header('X-Country-Id');
+
+        if (!$countryId) {
+            $database = $request->query('database') ?? $request->header('X-Country-Code');
+            if ($database && isset($this->countryCodes[$database])) {
+                return $this->countryCodes[$database];
+            }
+        }
+
+        return $countryId ?: '1';
     }
 
     private function clearCache(string $connection, ?int $classId = null): void
@@ -47,11 +103,12 @@ class SchoolClassApiController extends Controller
     /**
      * GET /api/school-classes?country_id=1
      * جلب جميع الصفوف
+     * Supports: query param (country_id, database) and headers (X-Country-Id, X-Country-Code)
      */
     public function index(Request $request)
     {
-        $countryId = $request->query('country_id', '1');
-        $connection = $this->connection($countryId);
+        $connection = $this->connection($request);
+        $countryId = $this->getCountryId($request);
 
         // Use cache for school classes
         $cacheKey = "school_classes_{$connection}";
@@ -73,11 +130,27 @@ class SchoolClassApiController extends Controller
     /**
      * GET /api/school-classes/{id}?country_id=1
      * عرض صف واحد
+     * Supports: query param (country_id, database) and headers (X-Country-Id, X-Country-Code)
      */
     public function show(Request $request, $id)
     {
-        $countryId = $request->query('country_id', '1');
-        $connection = $this->connection($countryId);
+        $connection = $this->connection($request);
+        $countryId = $this->getCountryId($request);
+
+        // Debug log for SSR troubleshooting
+        if (config('app.debug')) {
+            Log::debug('SchoolClass show request', [
+                'id' => $id,
+                'connection' => $connection,
+                'country_id' => $countryId,
+                'query_params' => $request->query(),
+                'headers' => [
+                    'X-Country-Id' => $request->header('X-Country-Id'),
+                    'X-Country-Code' => $request->header('X-Country-Code'),
+                    'X-Frontend-Key' => $request->header('X-Frontend-Key') ? 'present' : 'missing',
+                ],
+            ]);
+        }
 
         // Get cache version for invalidation (set when articles are created/updated)
         $cacheVersion = Cache::get("filter_cache_version_{$connection}", 0);
@@ -195,8 +268,7 @@ class SchoolClassApiController extends Controller
      */
     public function destroy(Request $request, $id)
     {
-        $countryId = $request->query('country_id', '1');
-        $connection = $this->connection($countryId);
+        $connection = $this->connection($request);
 
         $class = SchoolClass::on($connection)->findOrFail($id);
 
