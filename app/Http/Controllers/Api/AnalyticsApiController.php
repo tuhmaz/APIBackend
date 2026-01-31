@@ -264,9 +264,8 @@ class AnalyticsApiController extends Controller
     private function getActiveVisitorsDetailed(array $options = [])
     {
         $activityWindowMinutes = (int) config('monitoring.visitor_active_minutes', 5);
-        $includeBots = (bool) ($options['include_bots'] ?? false);
-        $perPage = $options['per_page'] ?? 20;
-        $withHistory = (bool) ($options['with_history'] ?? true);
+        $includeBots = (bool) ($options['include_bots'] ?? true); // تضمين البوتات افتراضياً
+        $withHistory = (bool) ($options['with_history'] ?? false); // تعطيل السجل افتراضياً للأداء
 
         $recordsQuery = DB::connection('jo')->table('visitors_tracking')
             ->where('last_activity', '>=', now()->subMinutes($activityWindowMinutes))
@@ -279,10 +278,7 @@ class AnalyticsApiController extends Controller
             });
         }
 
-        if ($perPage !== null) {
-            $recordsQuery->limit($perPage);
-        }
-
+        // جلب جميع الزوار النشطين بدون حد أقصى
         $records = $recordsQuery->get();
 
         $userIds = $records->pluck('user_id')->filter()->unique()->values();

@@ -52,14 +52,14 @@ class VisitorService
     public function getVisitorStats()
     {
         try {
-            // عدد الزوار الحاليين (آخر 5 دقائق)
-            $currentVisitors = Cache::remember('current_visitors', 300, function () {
+            // عدد الزوار الحاليين (آخر 5 دقائق) - تحديث كل 30 ثانية للدقة
+            $currentVisitors = Cache::remember('current_visitors', 30, function () {
                 return VisitorTracking::where('last_activity', '>=', now()->subMinutes(5))->count();
             });
 
-            // عدد زيارات اليوم
-            $totalToday = Cache::remember('total_today_visitors', 86400, function () {
-                return VisitorTracking::whereDate('created_at', today())->count();
+            // عدد زيارات اليوم (نشاط اليوم وليس فقط الإنشاء)
+            $totalToday = Cache::remember('total_today_visitors', 300, function () {
+                return VisitorTracking::whereDate('last_activity', today())->count();
             });
 
             // الزوار في آخر ساعة
