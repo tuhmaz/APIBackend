@@ -92,26 +92,81 @@ class VisitorTrackingMiddleware
             $user = $request->user(); 
             $userId = $user ? $user->id : null;
 
-            // 4. Lightweight Parsing (No external API calls to prevent timeouts)
-            // We skip getGeoDataFromIP to prevent 1m+ delays caused by external API timeouts.
-            // We use simple string matching for Browser/OS to avoid heavy regex libraries.
-            
+            // 4. Lightweight Parsing (Case-insensitive detection)
             $browser = 'Unknown';
             $os = 'Unknown';
-            
-            $ua = $userAgent;
-            if (strpos($ua, 'Chrome') !== false) $browser = 'Chrome';
-            elseif (strpos($ua, 'Firefox') !== false) $browser = 'Firefox';
-            elseif (strpos($ua, 'Safari') !== false) $browser = 'Safari';
-            elseif (strpos($ua, 'Edge') !== false) $browser = 'Edge';
-            elseif (strpos($ua, 'Opera') !== false) $browser = 'Opera';
 
-            if (strpos($ua, 'Windows') !== false) $os = 'Windows';
-            elseif (strpos($ua, 'Mac') !== false) $os = 'macOS';
-            elseif (strpos($ua, 'Linux') !== false) $os = 'Linux';
-            elseif (strpos($ua, 'Android') !== false) $os = 'Android';
-            elseif (strpos($ua, 'iPhone') !== false || strpos($ua, 'iPad') !== false) $os = 'iOS';
-            elseif (strpos($ua, 'bot') !== false || strpos($ua, 'crawl') !== false) $os = 'Bot';
+            $ua = strtolower($userAgent);
+
+            // Browser detection (order matters - check specific before generic)
+            if (strpos($ua, 'edg/') !== false || strpos($ua, 'edge/') !== false) {
+                $browser = 'Edge';
+            } elseif (strpos($ua, 'opr/') !== false || strpos($ua, 'opera') !== false) {
+                $browser = 'Opera';
+            } elseif (strpos($ua, 'chrome') !== false || strpos($ua, 'crios') !== false) {
+                $browser = 'Chrome';
+            } elseif (strpos($ua, 'firefox') !== false || strpos($ua, 'fxios') !== false) {
+                $browser = 'Firefox';
+            } elseif (strpos($ua, 'safari') !== false) {
+                $browser = 'Safari';
+            } elseif (strpos($ua, 'msie') !== false || strpos($ua, 'trident') !== false) {
+                $browser = 'IE';
+            } elseif (strpos($ua, 'curl') !== false) {
+                $browser = 'cURL';
+            } elseif (strpos($ua, 'postman') !== false) {
+                $browser = 'Postman';
+            } elseif (strpos($ua, 'insomnia') !== false) {
+                $browser = 'Insomnia';
+            } elseif (strpos($ua, 'axios') !== false || strpos($ua, 'node') !== false || strpos($ua, 'fetch') !== false) {
+                $browser = 'API Client';
+            } elseif (strpos($ua, 'okhttp') !== false) {
+                $browser = 'Android App';
+            } elseif (strpos($ua, 'cfnetwork') !== false || strpos($ua, 'darwin') !== false) {
+                $browser = 'iOS App';
+            }
+
+            // OS detection
+            if (strpos($ua, 'windows nt 10') !== false || strpos($ua, 'windows nt 11') !== false) {
+                $os = 'Windows 10/11';
+            } elseif (strpos($ua, 'windows') !== false) {
+                $os = 'Windows';
+            } elseif (strpos($ua, 'iphone') !== false) {
+                $os = 'iOS (iPhone)';
+            } elseif (strpos($ua, 'ipad') !== false) {
+                $os = 'iOS (iPad)';
+            } elseif (strpos($ua, 'android') !== false) {
+                $os = 'Android';
+            } elseif (strpos($ua, 'mac os x') !== false || strpos($ua, 'macintosh') !== false) {
+                $os = 'macOS';
+            } elseif (strpos($ua, 'linux') !== false) {
+                $os = 'Linux';
+            } elseif (strpos($ua, 'cros') !== false) {
+                $os = 'Chrome OS';
+            }
+
+            // Bot detection
+            $botPatterns = ['bot', 'crawl', 'spider', 'slurp', 'googlebot', 'bingbot', 'yandex',
+                           'baidu', 'duckduck', 'facebookexternalhit', 'twitterbot', 'linkedinbot',
+                           'whatsapp', 'telegram', 'scraper', 'curl', 'wget', 'python', 'java/',
+                           'go-http', 'ruby', 'perl', 'php/', 'apache', 'nginx'];
+            foreach ($botPatterns as $pattern) {
+                if (strpos($ua, $pattern) !== false) {
+                    $os = 'Bot/Crawler';
+                    if ($browser === 'Unknown') {
+                        $browser = 'Bot';
+                    }
+                    break;
+                }
+            }
+
+            // If still unknown, try to provide more info
+            if ($browser === 'Unknown' && $os === 'Unknown') {
+                // Check if it's an API request without standard browser UA
+                if (empty($userAgent) || strlen($userAgent) < 10) {
+                    $browser = 'API/Script';
+                    $os = 'Server';
+                }
+            }
 
             // 5. Get geo data (cached, non-blocking)
             $geoData = $this->visitorService->getGeoDataFromIP($ip);

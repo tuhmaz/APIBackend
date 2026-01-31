@@ -376,6 +376,7 @@ public function getGeoDataFromIP($ip)
 protected function fetchFromIpwhois(string $ip): ?array
 {
     $timeout = (int) config('geoip.http_timeout', 3);
+    /** @var \Illuminate\Http\Client\Response $response */
     $response = Http::timeout($timeout)->retry(2, 200)->get('https://ipwho.is/' . $ip);
     if (!$response->ok()) {
         return null;
@@ -398,6 +399,7 @@ protected function fetchFromIpwhois(string $ip): ?array
 protected function fetchFromIpapi(string $ip): ?array
 {
     $timeout = (int) config('geoip.http_timeout', 3);
+    /** @var \Illuminate\Http\Client\Response $response */
     $response = Http::timeout($timeout)->retry(2, 200)->get('https://ipapi.co/' . $ip . '/json/');
     if (!$response->ok()) {
         return null;
@@ -420,6 +422,7 @@ protected function fetchFromIpapi(string $ip): ?array
 protected function fetchFromIpApiCom(string $ip): ?array
 {
     $timeout = (int) config('geoip.http_timeout', 3);
+    /** @var \Illuminate\Http\Client\Response $response */
     $response = Http::timeout($timeout)->retry(2, 200)->get('http://ip-api.com/json/' . $ip, [
         'fields' => 'status,country,city,lat,lon',
     ]);

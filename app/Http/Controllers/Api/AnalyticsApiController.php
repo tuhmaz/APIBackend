@@ -351,40 +351,203 @@ class AnalyticsApiController extends Controller
         $path = parse_url($url, PHP_URL_PATH) ?: '/';
         $query = parse_url($url, PHP_URL_QUERY);
 
+        // الصفحات الثابتة - Frontend
         $pageNames = [
-            '/'                                => 'الصفحة الرئيسية',
-            '/dashboard'                        => 'لوحة التحكم',
-            '/dashboard/analytics/visitors'     => 'تحليلات الزوار',
-            '/login'                            => 'تسجيل الدخول',
-            '/register'                         => 'التسجيل',
-            '/news'                             => 'الأخبار',
-            '/articles'                         => 'المقالات',
-            '/contact'                          => 'اتصل بنا',
-            '/about'                            => 'من نحن',
+            '/'                     => 'الصفحة الرئيسية',
+            '/home'                 => 'الصفحة الرئيسية',
+            '/login'                => 'تسجيل الدخول',
+            '/register'             => 'إنشاء حساب',
+            '/forgot-password'      => 'استعادة كلمة المرور',
+            '/reset-password'       => 'إعادة تعيين كلمة المرور',
+            '/verify-email'         => 'تأكيد البريد',
+            '/news'                 => 'الأخبار',
+            '/articles'             => 'المقالات',
+            '/posts'                => 'المنشورات',
+            '/categories'           => 'الأقسام',
+            '/contact'              => 'اتصل بنا',
+            '/about'                => 'من نحن',
+            '/privacy'              => 'سياسة الخصوصية',
+            '/terms'                => 'الشروط والأحكام',
+            '/search'               => 'البحث',
+            '/profile'              => 'الملف الشخصي',
+            '/settings'             => 'الإعدادات',
+            '/notifications'        => 'الإشعارات',
+            '/messages'             => 'الرسائل',
+            '/favorites'            => 'المفضلة',
+            '/bookmarks'            => 'المحفوظات',
         ];
 
-        if (isset($pageNames[$path])) {
-            return $pageNames[$path];
+        // صفحات لوحة التحكم
+        $dashboardPages = [
+            '/dashboard'                    => 'لوحة التحكم',
+            '/dashboard/analytics'          => 'التحليلات',
+            '/dashboard/analytics/visitors' => 'تحليلات الزوار',
+            '/dashboard/articles'           => 'إدارة المقالات',
+            '/dashboard/articles/create'    => 'إنشاء مقال',
+            '/dashboard/news'               => 'إدارة الأخبار',
+            '/dashboard/news/create'        => 'إنشاء خبر',
+            '/dashboard/posts'              => 'إدارة المنشورات',
+            '/dashboard/posts/create'       => 'إنشاء منشور',
+            '/dashboard/categories'         => 'إدارة الأقسام',
+            '/dashboard/users'              => 'إدارة المستخدمين',
+            '/dashboard/users/create'       => 'إنشاء مستخدم',
+            '/dashboard/roles'              => 'الصلاحيات والأدوار',
+            '/dashboard/settings'           => 'إعدادات النظام',
+            '/dashboard/security'           => 'الأمان',
+            '/dashboard/security/logs'      => 'سجلات الأمان',
+            '/dashboard/sitemap'            => 'خريطة الموقع',
+            '/dashboard/files'              => 'إدارة الملفات',
+            '/dashboard/media'              => 'مكتبة الوسائط',
+            '/dashboard/comments'           => 'إدارة التعليقات',
+            '/dashboard/activities'         => 'سجل النشاطات',
+            '/dashboard/notifications'      => 'الإشعارات',
+            '/dashboard/messages'           => 'الرسائل',
+            '/dashboard/profile'            => 'الملف الشخصي',
+        ];
+
+        // API endpoints
+        $apiEndpoints = [
+            '/api/front/settings'       => 'جلب إعدادات الموقع',
+            '/api/front/home'           => 'جلب الصفحة الرئيسية',
+            '/api/front/menu'           => 'جلب القوائم',
+            '/api/front/footer'         => 'جلب الفوتر',
+            '/api/categories'           => 'جلب الأقسام',
+            '/api/articles'             => 'جلب المقالات',
+            '/api/news'                 => 'جلب الأخبار',
+            '/api/posts'                => 'جلب المنشورات',
+            '/api/comments'             => 'جلب التعليقات',
+            '/api/search'               => 'البحث',
+            '/api/auth/login'           => 'تسجيل الدخول (API)',
+            '/api/auth/register'        => 'إنشاء حساب (API)',
+            '/api/auth/logout'          => 'تسجيل الخروج (API)',
+            '/api/auth/user'            => 'جلب بيانات المستخدم',
+            '/api/user/profile'         => 'الملف الشخصي (API)',
+            '/api/user/notifications'   => 'الإشعارات (API)',
+            '/api/dashboard'            => 'لوحة التحكم (API)',
+            '/api/dashboard/analytics'  => 'التحليلات (API)',
+            '/api/dashboard/visitor-analytics' => 'تحليلات الزوار (API)',
+            '/api/dashboard/articles'   => 'المقالات (API)',
+            '/api/dashboard/news'       => 'الأخبار (API)',
+            '/api/dashboard/posts'      => 'المنشورات (API)',
+            '/api/dashboard/users'      => 'المستخدمين (API)',
+            '/api/dashboard/categories' => 'الأقسام (API)',
+            '/api/dashboard/settings'   => 'الإعدادات (API)',
+            '/api/dashboard/security'   => 'الأمان (API)',
+            '/api/dashboard/sitemap'    => 'خريطة الموقع (API)',
+        ];
+
+        // دمج جميع الصفحات
+        $allPages = array_merge($pageNames, $dashboardPages, $apiEndpoints);
+
+        if (isset($allPages[$path])) {
+            return $allPages[$path];
         }
 
-        // صفحات تحتوي معرف
-        if (preg_match('/\/(\w+)\/(\d+)/', $path, $matches)) {
+        // التعامل مع صفحات التعديل في لوحة التحكم
+        if (preg_match('/^\/dashboard\/(\w+)\/(\d+)\/edit$/', $path, $matches)) {
             $section = $matches[1];
             $id = $matches[2];
-
             $names = [
-                'news'       => 'خبر رقم',
-                'articles'   => 'مقال رقم',
-                'users'      => 'مستخدم رقم',
-                'categories' => 'قسم رقم',
+                'articles'   => 'تعديل مقال',
+                'news'       => 'تعديل خبر',
+                'posts'      => 'تعديل منشور',
+                'categories' => 'تعديل قسم',
+                'users'      => 'تعديل مستخدم',
+                'pages'      => 'تعديل صفحة',
             ];
-
             if (isset($names[$section])) {
-                return $names[$section] . ' ' . $id;
+                return $names[$section] . ' #' . $id;
             }
         }
 
-        return $query ? "$path?$query" : $path;
+        // التعامل مع صفحات العرض في لوحة التحكم
+        if (preg_match('/^\/dashboard\/(\w+)\/(\d+)$/', $path, $matches)) {
+            $section = $matches[1];
+            $id = $matches[2];
+            $names = [
+                'articles'   => 'عرض مقال',
+                'news'       => 'عرض خبر',
+                'posts'      => 'عرض منشور',
+                'categories' => 'عرض قسم',
+                'users'      => 'عرض مستخدم',
+            ];
+            if (isset($names[$section])) {
+                return $names[$section] . ' #' . $id;
+            }
+        }
+
+        // التعامل مع API endpoints بمعرف
+        if (preg_match('/^\/api\/(?:dashboard\/)?(\w+)\/(\d+)/', $path, $matches)) {
+            $section = $matches[1];
+            $id = $matches[2];
+            $names = [
+                'articles'   => 'جلب مقال',
+                'news'       => 'جلب خبر',
+                'posts'      => 'جلب منشور',
+                'categories' => 'جلب قسم',
+                'users'      => 'جلب مستخدم',
+                'comments'   => 'جلب تعليق',
+            ];
+            if (isset($names[$section])) {
+                return $names[$section] . ' #' . $id;
+            }
+        }
+
+        // صفحات Frontend بمعرف (مقال، خبر، منشور)
+        if (preg_match('/^\/(\w+)\/([a-z0-9\-]+)$/', $path, $matches)) {
+            $section = $matches[1];
+            $slug = $matches[2];
+            $names = [
+                'articles'   => 'قراءة مقال',
+                'news'       => 'قراءة خبر',
+                'posts'      => 'قراءة منشور',
+                'categories' => 'عرض قسم',
+                'tags'       => 'عرض وسم',
+                'authors'    => 'عرض كاتب',
+            ];
+            if (isset($names[$section])) {
+                // اختصار الـ slug إذا كان طويلاً
+                $shortSlug = strlen($slug) > 20 ? substr($slug, 0, 20) . '...' : $slug;
+                return $names[$section];
+            }
+        }
+
+        // API عام
+        if (str_starts_with($path, '/api/')) {
+            $apiPath = str_replace('/api/', '', $path);
+            $parts = explode('/', $apiPath);
+            if (count($parts) >= 1) {
+                $endpoint = $parts[0];
+                $endpointNames = [
+                    'front'         => 'واجهة الموقع',
+                    'auth'          => 'المصادقة',
+                    'user'          => 'المستخدم',
+                    'dashboard'     => 'لوحة التحكم',
+                    'articles'      => 'المقالات',
+                    'news'          => 'الأخبار',
+                    'posts'         => 'المنشورات',
+                    'categories'    => 'الأقسام',
+                    'comments'      => 'التعليقات',
+                    'search'        => 'البحث',
+                    'notifications' => 'الإشعارات',
+                    'settings'      => 'الإعدادات',
+                    'upload'        => 'رفع ملف',
+                    'media'         => 'الوسائط',
+                ];
+                if (isset($endpointNames[$endpoint])) {
+                    return 'API: ' . $endpointNames[$endpoint];
+                }
+            }
+            return 'API Request';
+        }
+
+        // إذا لم يتم التعرف على الصفحة
+        // تنظيف المسار وعرضه
+        $cleanPath = trim($path, '/');
+        $cleanPath = str_replace(['/', '-', '_'], ' ', $cleanPath);
+        $cleanPath = ucwords($cleanPath);
+
+        return $cleanPath ?: $path;
     }
 
     /**
