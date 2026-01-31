@@ -21,4 +21,12 @@ class PageVisit extends Model
     {
         return $this->belongsTo(VisitorTracking::class, 'visitor_id');
     }
+
+    /**
+     * Force the PageVisit model to always use the main connection
+     */
+    public function getConnectionName()
+    {
+        return 'jo';
+    }
 }

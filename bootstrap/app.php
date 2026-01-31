@@ -30,28 +30,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'api.throttle' => ApiRateLimiter::class,
         ]);
-        // API middlewares - Only essential ones for local development
-        // Heavy middlewares (UpdateUserLastActivity, VisitorTracking) disabled for speed
-        // Enable them in production by uncommenting
+        // API middlewares
         $middleware->api([
             SecurityHeaders::class,
-            // Disabled for local dev - requires Redis and slows down requests
-            // UpdateUserLastActivity::class,
-            // VisitorTrackingMiddleware::class,
+            UpdateUserLastActivity::class,
+            VisitorTrackingMiddleware::class,
         ]);
-        // Web middlewares - Optimized for performance
+        // Web middlewares
         $middleware->web([
             LocaleMiddleware::class,
             SecurityHeaders::class,
-            // Disabled all heavy middlewares for performance
-            // CompressResponse::class,
-            // CachePublicResponse::class,
-            // VisitorTrackingMiddleware::class,
-            // UpdateUserLastActivity::class,
-            // LogLastActivity::class,
-            // RequestMonitorMiddleware::class,
-            // SecurityScanMiddleware::class,
-            // StripContentEncodingHeader::class,
+            UpdateUserLastActivity::class,
+            VisitorTrackingMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

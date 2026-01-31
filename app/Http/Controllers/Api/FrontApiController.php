@@ -103,30 +103,40 @@ class FrontApiController extends Controller
      */
     public function settings()
     {
-        // Use cache for public settings only
-        $settings = Cache::remember('front_public_settings', 600, function () {
-            $allSettings = Setting::pluck('value', 'key')->toArray();
-
-            // فلترة الإعدادات - إرجاع فقط المسموح بها
-            $filteredSettings = [];
-            foreach ($this->publicSettings as $key) {
-                if (isset($allSettings[$key])) {
-                    $filteredSettings[$key] = $allSettings[$key];
+        try {
+            // Use cache for public settings only
+            $settings = Cache::remember('front_public_settings', 600, function () {
+                try {
+                    $allSettings = Setting::pluck('value', 'key')->toArray();
+                } catch (\Exception $e) {
+                    Log::error('Failed to fetch settings from DB: ' . $e->getMessage());
+                    return [];
                 }
-            }
 
-            // Fallback to config if not set in DB
-            if (empty($filteredSettings['google_analytics_id'])) {
-                $gaFromConfig = config('settings.google_analytics_id');
-                if (!empty($gaFromConfig)) {
-                    $filteredSettings['google_analytics_id'] = $gaFromConfig;
-                } elseif (!empty($filteredSettings['google_analytics'])) {
-                    $filteredSettings['google_analytics_id'] = $filteredSettings['google_analytics'];
+                // فلترة الإعدادات - إرجاع فقط المسموح بها
+                $filteredSettings = [];
+                foreach ($this->publicSettings as $key) {
+                    if (isset($allSettings[$key])) {
+                        $filteredSettings[$key] = $allSettings[$key];
+                    }
                 }
-            }
 
-            return $filteredSettings;
-        });
+                // Fallback to config if not set in DB
+                if (empty($filteredSettings['google_analytics_id'])) {
+                    $gaFromConfig = config('settings.google_analytics_id');
+                    if (!empty($gaFromConfig)) {
+                        $filteredSettings['google_analytics_id'] = $gaFromConfig;
+                    } elseif (!empty($filteredSettings['google_analytics'])) {
+                        $filteredSettings['google_analytics_id'] = $filteredSettings['google_analytics'];
+                    }
+                }
+
+                return $filteredSettings;
+            });
+        } catch (\Exception $e) {
+            Log::error('Settings API Error: ' . $e->getMessage());
+            $settings = [];
+        }
 
         return new BaseResource([
             'settings' => $settings

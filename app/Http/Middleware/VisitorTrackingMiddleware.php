@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use App\Models\VisitorTracking;
 use App\Models\VisitorSession;
+use App\Models\PageVisit;
 use App\Services\VisitorService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
@@ -118,7 +119,7 @@ class VisitorTrackingMiddleware
             $city = $geoData['city'] ?? null;
 
             // 6. DB Write (Safe Update)
-            VisitorTracking::updateOrCreate(
+            $visitor = VisitorTracking::updateOrCreate(
                 [
                     'ip_address' => $ip,
                 ],
@@ -136,7 +137,13 @@ class VisitorTrackingMiddleware
                 ]
             );
 
-            // 7. Optional: Visitor Session Log (Debounced)
+            // 7. Track Page Visit (for pageViews analytics)
+            PageVisit::create([
+                'visitor_id' => $visitor->id,
+                'page_url'   => substr($url, 0, 2048),
+            ]);
+
+            // 8. Optional: Visitor Session Log (Debounced)
             // Only if strictly needed, otherwise skip to save another DB write
             // $this->logSession($request, $user, $ip);
 

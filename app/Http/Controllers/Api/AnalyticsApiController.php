@@ -48,7 +48,7 @@ class AnalyticsApiController extends Controller
         $startDate = now()->subDays($days);
 
         // Visitors (Sessions)
-        $visitors = DB::table('visitors_tracking')
+        $visitors = DB::connection('jo')->table('visitors_tracking')
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
             ->whereBetween('created_at', [$startDate, $endDate])
             ->groupBy('date')
@@ -57,7 +57,7 @@ class AnalyticsApiController extends Controller
             ->pluck('count', 'date');
 
         // Page Views
-        $pageViews = DB::table('page_visits')
+        $pageViews = DB::connection('jo')->table('page_visits')
             ->select(DB::raw('DATE(created_at) as date'), DB::raw('count(*) as count'))
             ->whereBetween('created_at', [$startDate, $endDate])
             ->groupBy('date')
@@ -98,7 +98,7 @@ class AnalyticsApiController extends Controller
     protected function getDeviceStats()
     {
         // Group by OS as a proxy for device type
-        $stats = DB::table('visitors_tracking')
+        $stats = DB::connection('jo')->table('visitors_tracking')
             ->select('os', DB::raw('count(*) as count'))
             ->whereNotNull('os')
             ->where('created_at', '>=', now()->subDays(30))
@@ -156,7 +156,7 @@ class AnalyticsApiController extends Controller
      */
     protected function getTrafficSources()
     {
-        $stats = DB::table('visitors_tracking')
+        $stats = DB::connection('jo')->table('visitors_tracking')
             ->select('referer', DB::raw('count(*) as count'))
             ->where('created_at', '>=', now()->subDays(30))
             ->groupBy('referer')
@@ -268,7 +268,7 @@ class AnalyticsApiController extends Controller
         $perPage = $options['per_page'] ?? 20;
         $withHistory = (bool) ($options['with_history'] ?? true);
 
-        $recordsQuery = DB::table('visitors_tracking')
+        $recordsQuery = DB::connection('jo')->table('visitors_tracking')
             ->where('last_activity', '>=', now()->subMinutes($activityWindowMinutes))
             ->orderBy('last_activity', 'desc');
 
@@ -301,7 +301,7 @@ class AnalyticsApiController extends Controller
             $history = collect();
             if ($withHistory) {
                 // Fetch recent history for this IP
-                $history = DB::table('visitors_tracking')
+                $history = DB::connection('jo')->table('visitors_tracking')
                     ->where('ip_address', $v->ip_address)
                     ->orderBy('created_at', 'desc')
                     ->limit(10)
@@ -415,7 +415,7 @@ class AnalyticsApiController extends Controller
     public function getCountryStats()
     {
         return Cache::remember('country_stats', 3600, function () {
-            return DB::table('visitors_tracking')
+            return DB::connection('jo')->table('visitors_tracking')
                 ->select('country', DB::raw('COUNT(*) as count'))
                 ->where('created_at', '>=', now()->subDays(7))
                 ->whereNotNull('country')

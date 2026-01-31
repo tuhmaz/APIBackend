@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
+    protected $connection = 'jo';
+
     protected $fillable = [
         'key',
         'value',

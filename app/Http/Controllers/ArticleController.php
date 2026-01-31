@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Jobs\GenerateSitemapJob;
 
 class ArticleController extends Controller
 {
@@ -220,6 +221,8 @@ class ArticleController extends Controller
               });
       });
 
+      // توليد خريطة الموقع تلقائياً
+      GenerateSitemapJob::dispatch($connection, 'articles');
 
       return redirect()->route('dashboard.articles.index', ['country' => $country])->with('success', 'Article created successfully.');
   }
@@ -398,6 +401,9 @@ class ArticleController extends Controller
           }
       }
 
+      // توليد خريطة الموقع تلقائياً
+      GenerateSitemapJob::dispatch($connection, 'articles');
+
       return redirect()->route('dashboard.articles.index', ['country' => $country])->with('success', 'Article updated successfully.');
   }
 
@@ -428,6 +434,9 @@ class ArticleController extends Controller
 
     // حذف المقال من قاعدة البيانات
     $article->delete();
+
+    // توليد خريطة الموقع تلقائياً
+    GenerateSitemapJob::dispatch($connection, 'articles');
 
     return redirect()->route('dashboard.articles.index', ['country' => $country])
         ->with('success', 'تم حذف المقال والصور والملفات المرتبطة به بنجاح.');

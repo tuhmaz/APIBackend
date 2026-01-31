@@ -76,7 +76,7 @@ class VisitorService
 
             // سجل الزيارات خلال آخر 24 ساعة، مجمّعة بالساعة
             $history = Cache::remember('visitor_history', 3600, function () {
-                return DB::table('visitors_tracking')
+                return DB::connection('jo')->table('visitors_tracking')
                     ->select(
                         DB::raw('DATE_FORMAT(created_at, "%Y-%m-%d %H:00:00") as timestamp'),
                         DB::raw('COUNT(*) as count')
@@ -120,7 +120,7 @@ class VisitorService
     {
         try {
             // جلب جميع عناوين IP من آخر 24 ساعة مع عدد الزيارات لكل IP
-            $visitors = DB::table('visitors_tracking')
+            $visitors = DB::connection('jo')->table('visitors_tracking')
                 ->select('ip_address', DB::raw('COUNT(*) as count'))
                 ->whereNotNull('ip_address')
                 ->where('created_at', '>=', now()->subDay())

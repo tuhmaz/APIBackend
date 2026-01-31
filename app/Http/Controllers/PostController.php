@@ -16,6 +16,7 @@ use App\Models\Post;
 use App\Models\Category;
 use App\Models\Keyword;
 use App\Models\File;
+use App\Jobs\GenerateSitemapJob;
 
 
 class PostController extends NewsController
@@ -281,6 +282,9 @@ try {
         DB::connection($connection)->commit();
         Log::info('Post created successfully', ['post_id' => $post->id]);
 
+        // توليد خريطة الموقع تلقائياً
+        GenerateSitemapJob::dispatch($connection, 'posts');
+
         return redirect()
             ->route('dashboard.posts.index', ['country' => $validated['country']])
             ->with('success', __('Post created successfully'));
@@ -398,6 +402,9 @@ public function update(Request $request, $id)
 
             DB::connection($connection)->commit();
 
+            // توليد خريطة الموقع تلقائياً
+            GenerateSitemapJob::dispatch($connection, 'posts');
+
             return redirect()
                 ->route('dashboard.posts.index', ['country' => $validated['country']])
                 ->with('success', __('Post updated successfully'));
@@ -445,6 +452,9 @@ public function destroy(Request $request, $id)
             $post->delete();
 
             DB::connection($connection)->commit();
+
+            // توليد خريطة الموقع تلقائياً
+            GenerateSitemapJob::dispatch($connection, 'posts');
 
             return redirect()
             ->route('dashboard.posts.index', ['country' => $country])

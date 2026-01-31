@@ -158,22 +158,33 @@ class SchoolClassApiController extends Controller
         // Use cache with version - 60 seconds TTL for fresher data
         $cacheKey = "school_class_{$connection}_{$id}_v{$cacheVersion}";
         $schoolClass = $this->remember($cacheKey, 60, function () use ($connection, $id) {
-            return SchoolClass::on($connection)
-                ->with(['subjects' => function ($query) {
-                    // Count only published articles
-                    $query->withCount([
-                        'articles' => function ($q) {
-                            $q->where('status', 1);
-                        },
-                        'files' => function ($q) {
-                            $q->whereHas('article', function ($aq) {
-                                $aq->where('status', 1);
-                            });
-                        }
-                    ]);
-                }, 'semesters'])
-                ->findOrFail($id);
+            try {
+                return SchoolClass::on($connection)
+                    ->with(['subjects' => function ($query) {
+                        // Count only published articles
+                        $query->withCount([
+                            'articles' => function ($q) {
+                                $q->where('status', 1);
+                            },
+                            'files' => function ($q) {
+                                $q->whereHas('article', function ($aq) {
+                                    $aq->where('status', 1);
+                                });
+                            }
+                        ]);
+                    }, 'semesters'])
+                    ->findOrFail($id);
+            } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+                throw $e;
+            } catch (\Exception $e) {
+                Log::error("Failed to fetch school class {$id} ({$connection}): " . $e->getMessage());
+                return null;
+            }
         });
+
+        if (!$schoolClass) {
+            abort(404, 'Class not found or database error');
+        }
 
         return new SchoolClassResource($schoolClass);
     }
