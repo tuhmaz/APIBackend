@@ -29,6 +29,16 @@ class DatabaseManager
     private static ?string $currentConnection = null;
 
     /**
+     * Flag to prevent duplicate logging per request
+     */
+    private static bool $connectionLogged = false;
+
+    /**
+     * Default connection name
+     */
+    private const DEFAULT_CONNECTION = 'jo';
+
+    /**
      * Country ID to database connection mapping
      */
     private static array $countryConnections = [
@@ -66,7 +76,7 @@ class DatabaseManager
         }
 
         // Default to Jordan
-        return 'jo';
+        return self::DEFAULT_CONNECTION;
     }
 
     /**
@@ -82,17 +92,26 @@ class DatabaseManager
 
         // Only switch if different from current
         if (self::$currentConnection !== $connection) {
+            $previousConnection = self::$currentConnection;
             self::$currentConnection = $connection;
 
             // Set as default connection for the request
             DB::setDefaultConnection($connection);
 
-            // Log connection switch in debug mode
-            if (config('app.debug')) {
-                Log::debug('Database connection switched', [
-                    'connection' => $connection,
-                    'country_id' => $countryId,
-                ]);
+            // Log connection switch only once per request and only for actual switches
+            // Skip logging when switching from null (initial state) to default connection
+            if (config('app.debug') && !self::$connectionLogged) {
+                $isActualSwitch = $previousConnection !== null || $connection !== self::DEFAULT_CONNECTION;
+
+                if ($isActualSwitch) {
+                    Log::debug('Database connection switched', [
+                        'from' => $previousConnection ?? 'initial',
+                        'to' => $connection,
+                        'country_id' => $countryId,
+                    ]);
+                }
+
+                self::$connectionLogged = true;
             }
         }
 
@@ -238,6 +257,7 @@ class DatabaseManager
     public static function reset(): void
     {
         self::$currentConnection = null;
+        self::$connectionLogged = false;
         DB::setDefaultConnection(config('database.default'));
     }
 }
