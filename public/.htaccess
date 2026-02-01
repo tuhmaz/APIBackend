@@ -60,8 +60,8 @@
         Header set Cache-Control "public, max-age=31536000, immutable"
     </FilesMatch>
     
-    # Disable cache for PHP files
-    <FilesMatch "\.(php)$">
+    # Disable cache for PHP, HTML, and JSON files
+    <FilesMatch "\.(php|html|htm|json|xml)$">
         Header set Cache-Control "private, no-cache, no-store, must-revalidate"
     </FilesMatch>
 </IfModule>
