@@ -6,19 +6,18 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class PruneNotifications extends Command
+class PruneActivityLog extends Command
 {
     /**
-     * Available database connections for notifications
+     * Available database connections
      */
     protected array $connections = ['jo', 'sa', 'eg', 'ps'];
 
-    protected $signature = 'notifications:prune
-                            {--days=3 : Delete notifications older than this many days}
-                            {--read-only : Only delete READ notifications (default: delete all)}
+    protected $signature = 'activitylog:prune-all
+                            {--days=7 : Delete activity logs older than this many days}
                             {--connection= : Specific connection to prune (default: all)}';
 
-    protected $description = 'Prune old notifications (read and unread) older than specified days from all databases.';
+    protected $description = 'Prune old activity logs from all databases.';
 
     public function handle(): int
     {
@@ -29,7 +28,6 @@ class PruneNotifications extends Command
         }
 
         $threshold = now()->subDays($days);
-        $readOnly = (bool) $this->option('read-only');
         $specificConnection = $this->option('connection');
 
         // Determine which connections to process
@@ -39,11 +37,10 @@ class PruneNotifications extends Command
 
         $this->info('');
         $this->info('╔══════════════════════════════════════════════════════════════╗');
-        $this->info('║            🧹 Notifications Cleanup Started                   ║');
+        $this->info('║            🧹 Activity Log Cleanup Started                    ║');
         $this->info('╚══════════════════════════════════════════════════════════════╝');
         $this->info('');
         $this->info(sprintf('📅 Threshold: %s (%d days ago)', $threshold->toDateTimeString(), $days));
-        $this->info(sprintf('📋 Mode: %s', $readOnly ? 'Read notifications only' : 'All notifications (read + unread)'));
         $this->info(sprintf('🗄️  Databases: %s', implode(', ', $connectionsToProcess)));
         $this->info('');
 
@@ -54,16 +51,16 @@ class PruneNotifications extends Command
             $this->line("Processing database: <fg=cyan>{$connection}</>");
 
             try {
-                $deleted = $this->pruneConnection($connection, $threshold, $readOnly);
+                $deleted = $this->pruneConnection($connection, $threshold);
                 $results[$connection] = ['success' => true, 'deleted' => $deleted];
                 $grandTotal += $deleted;
 
-                $this->info("  ✓ Deleted {$deleted} notifications from {$connection}");
+                $this->info("  ✓ Deleted {$deleted} activity logs from {$connection}");
             } catch (\Exception $e) {
                 $results[$connection] = ['success' => false, 'error' => $e->getMessage()];
                 $this->error("  ✗ Error on {$connection}: {$e->getMessage()}");
 
-                Log::error('Notification pruning failed', [
+                Log::error('Activity log pruning failed', [
                     'connection' => $connection,
                     'error' => $e->getMessage(),
                 ]);
@@ -72,15 +69,14 @@ class PruneNotifications extends Command
 
         $this->info('');
         $this->info('════════════════════════════════════════════════════════════════');
-        $this->info(sprintf('🎉 Total deleted: <fg=green>%d</> notifications', $grandTotal));
+        $this->info(sprintf('🎉 Total deleted: <fg=green>%d</> activity logs', $grandTotal));
         $this->info('════════════════════════════════════════════════════════════════');
         $this->info('');
 
         // Log the cleanup
-        Log::info('Notifications pruned', [
+        Log::info('Activity logs pruned', [
             'days' => $days,
             'threshold' => $threshold->toDateTimeString(),
-            'read_only' => $readOnly,
             'total_deleted' => $grandTotal,
             'results' => $results,
         ]);
@@ -89,25 +85,21 @@ class PruneNotifications extends Command
     }
 
     /**
-     * Prune notifications from a specific connection
+     * Prune activity logs from a specific connection
      */
-    protected function pruneConnection(string $connection, $threshold, bool $readOnly): int
+    protected function pruneConnection(string $connection, $threshold): int
     {
+        $tableName = config('activitylog.table_name', 'activity_log');
         $total = 0;
         $batchSize = 2000;
 
         do {
-            $query = DB::connection($connection)
-                ->table('notifications')
-                ->where('created_at', '<', $threshold);
+            $deleted = DB::connection($connection)
+                ->table($tableName)
+                ->where('created_at', '<', $threshold)
+                ->limit($batchSize)
+                ->delete();
 
-            // If read-only mode, only delete read notifications
-            if ($readOnly) {
-                $query->whereNotNull('read_at');
-            }
-
-            // Delete in batches to avoid long locks
-            $deleted = $query->limit($batchSize)->delete();
             $total += $deleted;
 
             // Small delay to prevent database overload
@@ -122,7 +114,7 @@ class PruneNotifications extends Command
     /**
      * Static method for programmatic access (API usage)
      */
-    public static function pruneOldNotifications(int $days = 3, bool $readOnly = false, ?string $connection = null): array
+    public static function pruneOldActivityLogs(int $days = 7, ?string $connection = null): array
     {
         $command = new self();
         $threshold = now()->subDays($days);
@@ -132,14 +124,13 @@ class PruneNotifications extends Command
             'success' => true,
             'days' => $days,
             'threshold' => $threshold->toDateTimeString(),
-            'read_only' => $readOnly,
             'total_deleted' => 0,
             'details' => [],
         ];
 
         foreach ($connections as $conn) {
             try {
-                $deleted = $command->pruneConnection($conn, $threshold, $readOnly);
+                $deleted = $command->pruneConnection($conn, $threshold);
                 $results['details'][$conn] = ['success' => true, 'deleted' => $deleted];
                 $results['total_deleted'] += $deleted;
             } catch (\Exception $e) {
@@ -148,7 +139,7 @@ class PruneNotifications extends Command
             }
         }
 
-        Log::info('Notifications pruned via API', $results);
+        Log::info('Activity logs pruned via API', $results);
 
         return $results;
     }

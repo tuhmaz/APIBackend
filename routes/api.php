@@ -382,6 +382,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
             Route::post('/{id}/read', [NotificationApiController::class, 'markAsRead']);
             Route::post('/read-all', [NotificationApiController::class, 'markAllAsRead']);
             Route::post('/bulk', [NotificationApiController::class, 'bulkAction']);
+            Route::post('/prune', [NotificationApiController::class, 'prune']); // Clean old notifications
             Route::delete('/{id}', [NotificationApiController::class, 'destroy']);
         });
 

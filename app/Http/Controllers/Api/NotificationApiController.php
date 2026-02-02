@@ -251,4 +251,52 @@ class NotificationApiController extends Controller
             'message' => 'Notification deleted successfully',
         ]);
     }
+
+    /**
+     * Prune old notifications from all databases
+     * Requires 'manage settings' permission
+     */
+    public function prune(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return (new BaseResource(['message' => 'Unauthenticated']))
+                ->response($request)
+                ->setStatusCode(401);
+        }
+
+        // Check permission
+        if (!$user->can('manage settings')) {
+            return (new BaseResource(['message' => 'غير مصرح لك بهذا الإجراء']))
+                ->response($request)
+                ->setStatusCode(403);
+        }
+
+        $days = (int) $request->input('days', 3);
+        if ($days < 1) {
+            $days = 1;
+        }
+
+        $readOnly = (bool) $request->input('read_only', false);
+
+        try {
+            // Use the static method from PruneNotifications command
+            $result = \App\Console\Commands\PruneNotifications::pruneOldNotifications($days, $readOnly);
+
+            return new BaseResource([
+                'success' => true,
+                'message' => sprintf(
+                    'تم حذف %d إشعار أقدم من %d أيام',
+                    $result['total_deleted'],
+                    $days
+                ),
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return (new BaseResource([
+                'success' => false,
+                'message' => 'حدث خطأ أثناء حذف الإشعارات: ' . $e->getMessage(),
+            ]))->response($request)->setStatusCode(500);
+        }
+    }
 }

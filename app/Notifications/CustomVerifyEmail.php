@@ -91,14 +91,16 @@ class CustomVerifyEmail extends VerifyEmail implements ShouldQueue
 
             $verificationUrl = $this->verificationUrl($notifiable);
 
+            $appName = config('settings.site_name', config('app.name'));
+
             return (new MailMessage)
-                ->subject('تأكيد عنوان البريد الإلكتروني - ' . config('app.name'))
+                ->subject('تأكيد عنوان البريد الإلكتروني - ' . $appName)
                 ->greeting('مرحباً!')
-                ->line('شكراً لتسجيلك في ' . config('app.name') . '.')
+                ->line('شكراً لتسجيلك في ' . $appName . '.')
                 ->line('يرجى النقر على الزر أدناه لتأكيد عنوان بريدك الإلكتروني.')
                 ->action('تأكيد عنوان البريد الإلكتروني', $verificationUrl)
                 ->line('إذا لم تقم بإنشاء حساب، فلا حاجة لاتخاذ أي إجراء آخر.')
-                ->salutation('مع تحيات فريق ' . config('app.name'))
+                ->salutation('مع تحيات فريق ' . $appName)
                 ->theme('default')
                 ->from(config('mail.from.address'), config('mail.from.name'));
         } catch (\Exception $e) {
