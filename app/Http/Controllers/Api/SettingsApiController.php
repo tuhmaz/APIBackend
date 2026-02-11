@@ -152,9 +152,20 @@ class SettingsApiController extends Controller
                         try {
                             $value = AdSnippetSanitizer::sanitize($value, $adsenseClient, $key);
                             $data[$key] = $value;
-                        } catch (ValidationException $e) {
-                            Log::warning('Ad snippet validation failed', ['key' => $key]);
-                            throw $e;
+                        } catch (\Throwable $e) {
+                            if ($e instanceof ValidationException) {
+                                throw $e;
+                            }
+
+                            Log::warning('Ad snippet validation failed', [
+                                'setting_key' => $key,
+                                'trimmed_snippet' => Str::limit(trim((string) $value), 120),
+                                'error' => $e->getMessage(),
+                            ]);
+
+                            throw ValidationException::withMessages([
+                                $key => [__('Invalid AdSense snippet: ') . $e->getMessage()],
+                            ]);
                         }
                     } else {
                         $data[$key] = ''; // Allow clearing

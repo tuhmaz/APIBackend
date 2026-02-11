@@ -52,6 +52,7 @@ class FrontApiController extends Controller
         'copyright_text',
 
         // إعدادات الإعلانات
+        'adsense_client',
         'google_ads_desktop_home',
         'google_ads_desktop_home_2',
         'google_ads_mobile_home',

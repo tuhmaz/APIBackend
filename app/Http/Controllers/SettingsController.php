@@ -204,12 +204,20 @@ class SettingsController extends Controller
                         try {
                             $value = AdSnippetSanitizer::sanitize($value, $adsenseClient, $key);
                             $data[$key] = $value;
-                        } catch (ValidationException $e) {
+                        } catch (\Throwable $e) {
+                            if ($e instanceof ValidationException) {
+                                throw $e;
+                            }
+
                             Log::warning('Ad snippet validation failed', [
                                 'setting_key' => $key,
                                 'trimmed_snippet' => Str::limit(trim((string) $value), 120),
+                                'error' => $e->getMessage(),
                             ]);
-                            throw $e;
+
+                            throw ValidationException::withMessages([
+                                $key => [__('Invalid AdSense snippet: ') . $e->getMessage()],
+                            ]);
                         }
                     } else {
                         // Allow empty value (for clearing ad slots)

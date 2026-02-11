@@ -166,6 +166,12 @@ class AdSnippetSanitizer
         if (stripos($snippet, '<ins') !== false) {
             self::validateInsElement($snippet);
         }
+
+        // 4. Slot snippets (google_ads_*) must include an <ins class="adsbygoogle"> element.
+        // This prevents saving script-only snippets that cannot render ad units in page slots.
+        if (!preg_match('/<ins[^>]*class=["\'][^"\']*adsbygoogle[^"\']*["\'][^>]*>/i', $snippet)) {
+            throw new Exception('Invalid AdSense snippet: missing ins.adsbygoogle element');
+        }
     }
 
     /**

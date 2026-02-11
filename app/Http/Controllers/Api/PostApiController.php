@@ -46,12 +46,23 @@ class PostApiController extends Controller
         };
     }
 
+    /**
+     * Accept legacy and current country keys from query/body.
+     */
+    private function resolveCountry(Request $request, string $fallback = '1'): string
+    {
+        return (string) $request->input(
+            'country',
+            $request->input('database', $request->input('country_id', $fallback))
+        );
+    }
+
     /** ------------------------------
      *  GET /api/posts
      * ------------------------------ */
     public function index(Request $request)
     {
-        $country = $request->country ?? '1';
+        $country = $this->resolveCountry($request);
         $db = $this->connection($country);
 
         $sortBy = $request->input('sort_by', 'created_at');
@@ -99,7 +110,7 @@ class PostApiController extends Controller
      * ------------------------------ */
     public function show(Request $request, $id)
     {
-        $country = $request->country ?? '1';
+        $country = $this->resolveCountry($request);
         $db = $this->connection($country);
 
         // Use cache for individual post
@@ -118,7 +129,7 @@ class PostApiController extends Controller
      * ------------------------------ */
     public function incrementView(Request $request, $id)
     {
-        $country = $request->country ?? '1';
+        $country = $this->resolveCountry($request);
         $db = $this->connection($country);
 
         $post = Post::on($db)->findOrFail($id);
@@ -137,7 +148,7 @@ class PostApiController extends Controller
     public function toggleStatus(Request $request, $id)
     {
         try {
-            $country = (string) $request->input('country', '1');
+            $country = $this->resolveCountry($request);
             
             // Log the request for debugging
             Log::info("Toggle Status Request: ID={$id}, Country={$country}");
@@ -439,7 +450,7 @@ class PostApiController extends Controller
      * ------------------------------ */
     public function destroy(Request $request, $id)
     {
-        $country = $request->country ?? '1';
+        $country = $this->resolveCountry($request);
         $db = $this->connection($country);
 
         $post = Post::on($db)->findOrFail($id);
