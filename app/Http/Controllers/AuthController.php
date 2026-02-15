@@ -510,9 +510,100 @@ class AuthController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function googleRedirect()
+    private function mobileSchemes(): array
     {
-        return Socialite::driver('google')->redirect();
+        $raw = (string) env('MOBILE_AUTH_SCHEMES', 'alemancenter');
+        return collect(explode(',', $raw))
+            ->map(fn ($value) => strtolower(trim($value)))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function isValidMobileRedirectUri(?string $redirectUri): bool
+    {
+        if (!$redirectUri) {
+            return false;
+        }
+
+        $parts = parse_url($redirectUri);
+        if (!is_array($parts)) {
+            return false;
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        if ($scheme === '') {
+            return false;
+        }
+
+        return in_array($scheme, $this->mobileSchemes(), true);
+    }
+
+    private function encodeMobileState(string $mobileRedirectUri): string
+    {
+        $payload = [
+            'mobile' => 1,
+            'redirect' => $mobileRedirectUri,
+            'nonce' => Str::random(12),
+        ];
+        $encoded = base64_encode(json_encode($payload));
+        return rtrim(strtr($encoded, '+/', '-_'), '=');
+    }
+
+    private function decodeMobileState(?string $state): ?string
+    {
+        if (!$state) {
+            return null;
+        }
+
+        $normalized = strtr($state, '-_', '+/');
+        $padding = strlen($normalized) % 4;
+        if ($padding > 0) {
+            $normalized .= str_repeat('=', 4 - $padding);
+        }
+
+        $decoded = base64_decode($normalized, true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $payload = json_decode($decoded, true);
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $redirectUri = isset($payload['redirect']) && is_string($payload['redirect'])
+            ? $payload['redirect']
+            : null;
+
+        return $this->isValidMobileRedirectUri($redirectUri) ? $redirectUri : null;
+    }
+
+    private function appendQuery(string $url, array $query): string
+    {
+        $separator = str_contains($url, '?') ? '&' : '?';
+        return $url . $separator . http_build_query($query);
+    }
+
+    /**
+     * Redirect the user to the Google authentication page.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function googleRedirect(Request $request)
+    {
+        $mobileRequested = $request->boolean('mobile');
+        $mobileRedirectUri = $request->query('mobile_redirect_uri');
+        $mobileEnabled = $mobileRequested && $this->isValidMobileRedirectUri($mobileRedirectUri);
+
+        $driver = Socialite::driver('google')->stateless();
+        if ($mobileEnabled) {
+            $driver = $driver->with([
+                'state' => $this->encodeMobileState((string) $mobileRedirectUri),
+            ]);
+        }
+
+        return $driver->redirect();
     }
 
     /**
@@ -520,54 +611,57 @@ class AuthController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function googleCallback()
+    public function googleCallback(Request $request)
     {
+        $mobileRedirectUri = $this->decodeMobileState($request->query('state'));
+        $isMobileFlow = $this->isValidMobileRedirectUri($mobileRedirectUri);
+
         try {
-            // Log the beginning of the callback process
-            Log::info('Google callback initiated', ['request_data' => request()->all()]);
-            
-            // If Google returned an error (e.g., user clicked cancel), handle gracefully
-            if (request()->has('error')) {
-                $error = request('error');
-                $errorDescription = request('error_description');
+            Log::info('Google callback initiated', ['request_data' => $request->all()]);
+
+            if ($request->has('error')) {
                 Log::warning('Google OAuth returned error', [
-                    'error' => $error,
-                    'error_description' => $errorDescription,
-                    'state' => request('state')
+                    'error' => $request->query('error'),
+                    'error_description' => $request->query('error_description'),
+                    'state' => $request->query('state')
                 ]);
-                return redirect()->route('login')
-                    ->with('error', __('تم إلغاء تسجيل الدخول عبر Google أو تم رفض الإذن. الرجاء المحاولة مرة أخرى.'));
+
+                if ($isMobileFlow) {
+                    return redirect()->away($this->appendQuery((string) $mobileRedirectUri, [
+                        'error' => 'google_auth_cancelled',
+                    ]));
+                }
+
+                return redirect()->route('login')->with('error', __('Google login was cancelled.'));
             }
 
-            // Ensure the required `code` parameter exists before exchanging token
-            if (!request()->has('code')) {
+            if (!$request->has('code')) {
                 Log::warning('Google OAuth callback missing code parameter', [
-                    'query' => request()->query(),
+                    'query' => $request->query(),
                 ]);
-                return redirect()->route('login')
-                    ->with('error', __('تعذر إتمام تسجيل الدخول عبر Google: بيانات غير مكتملة من Google.'));
+
+                if ($isMobileFlow) {
+                    return redirect()->away($this->appendQuery((string) $mobileRedirectUri, [
+                        'error' => 'google_auth_failed',
+                    ]));
+                }
+
+                return redirect()->route('login')->with('error', __('Google login failed.'));
             }
 
-            // Get the Google user - use stateless to avoid session issues
             $provider = Socialite::driver('google');
             /** @var \Laravel\Socialite\Two\AbstractProvider $provider */
             $googleUser = $provider->stateless()->user();
-            
-            // Log successful retrieval of Google user data
+
             Log::info('Google user data retrieved', [
                 'google_id' => $googleUser->id,
                 'email' => $googleUser->email,
                 'name' => $googleUser->name
             ]);
-            
-            // Check if user exists
+
             $user = User::where('email', $googleUser->email)->first();
 
             if (!$user) {
-                // Create a new user
-                Log::info('Creating new user from Google login', ['email' => $googleUser->email]);
-                
-                // Prepare user data with required fields
                 $userData = [
                     'name' => $googleUser->name,
                     'email' => $googleUser->email,
@@ -575,85 +669,74 @@ class AuthController extends Controller
                     'email_verified_at' => now(),
                     'google_id' => $googleUser->id,
                 ];
-                
-                // Add profile photo only if it exists
+
                 if (!empty($googleUser->avatar)) {
                     $userData['profile_photo_path'] = $googleUser->avatar;
                 }
-                
-                // Create user with required fields
+
                 $user = User::create($userData);
-                
-                // Verify role exists before assigning
+
                 try {
                     $user->assignRole('User');
-                    Log::info('Role assigned to new user', ['user_id' => $user->id, 'role' => 'User']);
                 } catch (\Exception $roleException) {
                     Log::warning('Could not assign role to user', [
-                        'user_id' => $user->id, 
+                        'user_id' => $user->id,
                         'error' => $roleException->getMessage()
                     ]);
                 }
-                
-                Log::info('New user created from Google login', ['user_id' => $user->id]);
             } else {
-                // Update existing user's Google ID and avatar if not set
-                Log::info('Updating existing user from Google login', ['user_id' => $user->id]);
-                
                 $updateData = ['google_id' => $googleUser->id];
-                
-                // Add profile photo only if it exists
                 if (!empty($googleUser->avatar)) {
                     $updateData['profile_photo_path'] = $googleUser->avatar;
                 }
-                
                 $user->update($updateData);
             }
 
-            // تأكيد البريد الإلكتروني إذا لم يكن مؤكداً بالفعل
             if (!$user->hasVerifiedEmail()) {
                 $user->forceFill([
                     'email_verified_at' => now()
                 ])->save();
-                
-                Log::info('Email automatically verified for Google user', ['user_id' => $user->id]);
             }
-            
-            // تسجيل دخول المستخدم بشكل صحيح مع تجديد الجلسة
+
             Auth::login($user);
-            request()->session()->regenerate();
-            
-            Log::info('User logged in via Google', ['user_id' => $user->id]);
+            $request->session()->regenerate();
 
-            // التأكد من إعادة توجيه المستخدم بشكل صحيح
             if (Auth::check()) {
-                Log::info('User successfully authenticated after Google login', ['user_id' => $user->id]);
-                
-                // Generate Sanctum token for Frontend
                 $token = $user->createToken('google-login')->plainTextToken;
-                
-                // Redirect to Frontend with token
+
+                if ($isMobileFlow) {
+                    return redirect()->away($this->appendQuery((string) $mobileRedirectUri, [
+                        'token' => $token,
+                    ]));
+                }
+
                 $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
-                
                 return redirect()->to("{$frontendUrl}/auth/google/callback?token={$token}");
-            } else {
-                Log::error('User not authenticated after Google login', ['user_id' => $user->id]);
-                return redirect()->route('login')
-                    ->with('error', 'حدث خطأ أثناء تسجيل الدخول. الرجاء المحاولة مرة أخرى.');
             }
 
+            if ($isMobileFlow) {
+                return redirect()->away($this->appendQuery((string) $mobileRedirectUri, [
+                    'error' => 'google_auth_failed',
+                ]));
+            }
+
+            return redirect()->route('login')->with('error', __('Google login failed.'));
         } catch (\Exception $e) {
-            // Log the error with detailed information
             Log::error('Google login failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => request()->all(),
+                'request_data' => $request->all(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
             ]);
-            
-            return redirect()->route('login')
-                ->with('error', 'حدث خطأ أثناء تسجيل الدخول باستخدام Google. الرجاء المحاولة مرة أخرى.');
+
+            if ($isMobileFlow) {
+                return redirect()->away($this->appendQuery((string) $mobileRedirectUri, [
+                    'error' => 'google_auth_failed',
+                ]));
+            }
+
+            return redirect()->route('login')->with('error', __('Google login failed.'));
         }
     }
 }

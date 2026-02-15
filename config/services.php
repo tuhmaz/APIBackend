@@ -45,6 +45,8 @@ return [
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        // Keep web callback as default for backward compatibility.
+        // Mobile callback is overridden dynamically inside AuthApiController.
         'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/login/google/callback'),
     ],
 

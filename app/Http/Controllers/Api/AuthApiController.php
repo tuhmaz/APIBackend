@@ -321,31 +321,118 @@ class AuthApiController extends Controller
      * ============================
      */
 
+    private function mobileSchemes(): array
+    {
+        $raw = (string) env('MOBILE_AUTH_SCHEMES', 'alemancenter');
+        return collect(explode(',', $raw))
+            ->map(fn ($value) => strtolower(trim($value)))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function isValidMobileRedirectUri(?string $redirectUri): bool
+    {
+        if (!$redirectUri) {
+            return false;
+        }
+
+        $parts = parse_url($redirectUri);
+        if (!is_array($parts)) {
+            return false;
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        if ($scheme === '') {
+            return false;
+        }
+
+        return in_array($scheme, $this->mobileSchemes(), true);
+    }
+
+    private function appendQuery(string $url, array $query): string
+    {
+        $separator = str_contains($url, '?') ? '&' : '?';
+        return $url . $separator . http_build_query($query);
+    }
+
+    private function encodeMobileState(string $mobileRedirectUri): string
+    {
+        $payload = [
+            'mobile' => 1,
+            'redirect' => $mobileRedirectUri,
+            'nonce' => Str::random(12),
+        ];
+        $encoded = base64_encode(json_encode($payload));
+        return rtrim(strtr($encoded, '+/', '-_'), '=');
+    }
+
+    private function decodeMobileState(?string $state): ?string
+    {
+        if (!$state) {
+            return null;
+        }
+
+        $normalized = strtr($state, '-_', '+/');
+        $padding = strlen($normalized) % 4;
+        if ($padding > 0) {
+            $normalized .= str_repeat('=', 4 - $padding);
+        }
+
+        $decoded = base64_decode($normalized, true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $payload = json_decode($decoded, true);
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $redirectUri = isset($payload['redirect']) && is_string($payload['redirect'])
+            ? $payload['redirect']
+            : null;
+
+        return $this->isValidMobileRedirectUri($redirectUri) ? $redirectUri : null;
+    }
+
     /**
      * Redirect to Google OAuth
      * For SPA: Returns the redirect URL instead of redirecting
      */
     public function googleRedirect(Request $request)
     {
-        // For SPA, return the redirect URL as JSON
-        if ($request->wantsJson() || $request->has('spa')) {
-            /** @var AbstractProvider $driver */
-            $driver = Socialite::driver('google');
-            $redirectUrl = $driver
-                ->stateless()
-                ->redirect()
-                ->getTargetUrl();
+        $mobileRequested = $request->boolean('mobile');
+        $mobileRedirectUri = $request->query('mobile_redirect_uri');
+        $mobileEnabled = $mobileRequested && $this->isValidMobileRedirectUri($mobileRedirectUri);
 
+        if ($mobileRequested && !$mobileEnabled) {
+            return (new BaseResource([
+                'message' => 'رابط إعادة التوجيه للتطبيق غير صالح.',
+            ]))->response($request)->setStatusCode(422);
+        }
+
+        /** @var AbstractProvider $driver */
+        $driver = Socialite::driver('google');
+        if ($mobileEnabled) {
+            $driver = $driver->with([
+                'state' => $this->encodeMobileState((string) $mobileRedirectUri),
+            ]);
+        }
+
+        $redirectUrl = $driver
+            ->stateless()
+            ->redirect()
+            ->getTargetUrl();
+
+        if ($request->wantsJson() || $request->has('spa') || $mobileEnabled) {
             return new BaseResource([
                 'status' => true,
                 'redirect_url' => $redirectUrl,
             ]);
         }
 
-        // For traditional web, do the redirect
-        /** @var AbstractProvider $driver */
-        $driver = Socialite::driver('google');
-        return $driver->stateless()->redirect();
+        return redirect()->away($redirectUrl);
     }
 
     /**
@@ -354,6 +441,12 @@ class AuthApiController extends Controller
      */
     public function googleCallback(Request $request)
     {
+        $mobileRedirectUriFromState = $this->decodeMobileState($request->query('state'));
+        $mobileRequested = $request->boolean('mobile');
+        $mobileRedirectUriFromQuery = $mobileRequested ? $request->query('mobile_redirect_uri') : null;
+        $mobileRedirectUri = $mobileRedirectUriFromState ?: $mobileRedirectUriFromQuery;
+        $mobileEnabled = $this->isValidMobileRedirectUri($mobileRedirectUri);
+
         try {
             // Get user from Google using the authorization code
             /** @var AbstractProvider $driver */
@@ -387,20 +480,20 @@ class AuthApiController extends Controller
 
             $token = $this->issueToken($user);
 
-            // Check if this is a popup/SPA request
-            $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
-
-            // For SPA popup flow, redirect with token in URL
-            if ($request->has('state') || $request->wantsJson()) {
-                // Return JSON for API calls
-                if ($request->wantsJson()) {
-                    return new BaseResource([
-                        'status' => true,
-                        'token'  => $token,
-                        'user'   => new UserResource($user)
-                    ]);
-                }
+            if ($mobileEnabled) {
+                $target = $this->appendQuery((string) $mobileRedirectUri, ['token' => $token]);
+                return redirect()->away($target);
             }
+
+            if ($request->wantsJson()) {
+                return new BaseResource([
+                    'status' => true,
+                    'token'  => $token,
+                    'user'   => new UserResource($user)
+                ]);
+            }
+
+            $frontendUrl = config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:3000'));
 
             // Redirect to frontend with token
             return redirect()->to("{$frontendUrl}/auth/google/callback?token={$token}");
@@ -410,10 +503,14 @@ class AuthApiController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+            if ($mobileEnabled) {
+                $target = $this->appendQuery((string) $mobileRedirectUri, ['error' => 'google_auth_failed']);
+                return redirect()->away($target);
+            }
 
             // Redirect to frontend with error
             if (!request()->wantsJson()) {
+                $frontendUrl = config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:3000'));
                 return redirect()->to("{$frontendUrl}/login?error=google_auth_failed");
             }
 
