@@ -23,15 +23,34 @@ class PostNotification extends Notification
 
     public function toArray($notifiable)
     {
-        $url = '/dashboard/posts/' . $this->post->id;
-        
+        $countryCode = $this->resolveCountryCode();
+        $url = "/{$countryCode}/posts/{$this->post->id}";
+
         return [
-            'title' => 'منشور جديد',
-            'message' => 'تم نشر منشور جديد: ' . $this->post->title,
+            'title' => 'منشور جديد: ' . $this->post->title,
+            'message' => 'تم نشر منشور جديد.',
             'post_id' => $this->post->id,
-            'type' => 'Post',
+            'type' => 'post',
             'url' => $url,
-            'action_url' => $url
+            'action_url' => $url,
         ];
     }
+
+    private function resolveCountryCode(): string
+    {
+        $country = strtolower((string) ($this->post->country ?? ''));
+
+        if (in_array($country, ['jo', 'sa', 'eg', 'ps'], true)) {
+            return $country;
+        }
+
+        return match ($country) {
+            '1' => 'jo',
+            '2' => 'sa',
+            '3' => 'eg',
+            '4' => 'ps',
+            default => 'jo',
+        };
+    }
 }
+

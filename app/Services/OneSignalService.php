@@ -26,8 +26,8 @@ class OneSignalService
 
             $payload = [
                 'app_id' => $appId,
-                'headings' => ['en' => $title],
-                'contents' => ['en' => $message],
+                'headings' => ['en' => $title, 'ar' => $title],
+                'contents' => ['en' => $message, 'ar' => $message],
                 'included_segments' => $segments,
             ];
 

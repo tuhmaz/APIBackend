@@ -14,7 +14,7 @@ use App\Models\Comment;
 use Illuminate\Support\Facades\Cache;
 use App\Notifications\ArticleNotification;
 use App\Services\SecureFileUploadService;
-use App\Services\OneSignalService;
+use App\Services\FcmService;
 use App\Http\Resources\ArticleResource;
 use App\Http\Resources\ArticleCollection;
 use App\Http\Resources\BaseResource;
@@ -33,17 +33,14 @@ class ArticleApiController extends Controller
      */
     protected $secureFileUploadService;
 
-    /**
-     * @var OneSignalService
-     */
-    protected $oneSignalService;
+    protected FcmService $fcmService;
 
     public function __construct(
         SecureFileUploadService $secureFileUploadService,
-        OneSignalService $oneSignalService
+        FcmService $fcmService
     ) {
         $this->secureFileUploadService = $secureFileUploadService;
-        $this->oneSignalService = $oneSignalService;
+        $this->fcmService = $fcmService;
 
         // API عادة ستستخدم auth:sanctum في routes/api.php
         // هنا نضمن أن المستخدم مصدّق
@@ -390,7 +387,7 @@ class ArticleApiController extends Controller
             // Clear cache for related data
             $this->clearFilterCache($connection);
 
-            // إشعار OneSignal + Notifications
+            // Push notification + database notifications
             $this->sendNotification($article);
 
             // إرسال التنبيهات لكل الأعضاء (كما في الأصل) - use queue for better performance
@@ -947,8 +944,7 @@ class ArticleApiController extends Controller
      */
     protected function sendNotification(Article $article): void
     {
-        if (!config('onesignal.enabled')) {
-            Log::info('OneSignal is disabled via config. Skipping ArticleApiController::sendNotification');
+        if (!$this->fcmService->isEnabled()) {
             return;
         }
 
@@ -959,7 +955,19 @@ class ArticleApiController extends Controller
                 $title .= " (الصف: {$className})";
             }
 
-            $this->oneSignalService->sendNotification($title, $article->title);
+            $countryCode = in_array($article->getConnectionName(), ['jo', 'sa', 'eg', 'ps'], true)
+                ? $article->getConnectionName()
+                : 'jo';
+
+            $this->fcmService->sendToAllUsers(
+                $title,
+                $article->title,
+                [
+                    'type' => 'article',
+                    'article_id' => $article->id,
+                    'url' => "/{$countryCode}/lesson/articles/{$article->id}",
+                ]
+            );
         } catch (\Exception $e) {
             Log::warning('Failed to send notification: ' . $e->getMessage());
         }

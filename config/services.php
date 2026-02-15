@@ -50,4 +50,11 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/login/google/callback'),
     ],
 
+    'fcm' => [
+        'enabled' => env('FCM_ENABLED', false),
+        'project_id' => env('FCM_PROJECT_ID'),
+        'service_account_file' => env('FCM_SERVICE_ACCOUNT_FILE'),
+        'token_uri' => env('FCM_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
+    ],
+
 ];

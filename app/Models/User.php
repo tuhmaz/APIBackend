@@ -119,6 +119,11 @@ class User extends Authenticatable implements MustVerifyEmail
         $this->save();
     }
 
+    public function pushTokens()
+    {
+        return $this->hasMany(PushToken::class);
+    }
+
     /**
      * الحصول على رابط الصورة الشخصية للمستخدم (للتوافق مع الواجهات القديمة)
      *

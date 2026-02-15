@@ -12,7 +12,7 @@ use App\Models\User;
 use App\Models\Keyword;
 use App\Notifications\ArticleNotification;
 use App\Services\SecureFileUploadService;
-use App\Services\OneSignalService;
+use App\Services\FcmService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -26,16 +26,15 @@ class ArticleController extends Controller
    * خدمة التحميل الآمن للملفات
    */
   protected $secureFileUploadService;
-  /** @var OneSignalService */
-  protected $oneSignalService;
+  protected FcmService $fcmService;
 
   /**
    * إنشاء مثيل جديد من وحدة التحكم.
    */
-  public function __construct(SecureFileUploadService $secureFileUploadService, OneSignalService $oneSignalService)
+  public function __construct(SecureFileUploadService $secureFileUploadService, FcmService $fcmService)
   {
       $this->secureFileUploadService = $secureFileUploadService;
-      $this->oneSignalService = $oneSignalService;
+      $this->fcmService = $fcmService;
       $this->middleware('auth');
   }
 
@@ -229,15 +228,22 @@ class ArticleController extends Controller
 
   protected function sendNotification($article)
   {
-      // Respect global OneSignal toggle
-      if (!config('onesignal.enabled')) {
-          Log::info('OneSignal is disabled via config. Skipping ArticleController::sendNotification');
+      if (!$this->fcmService->isEnabled()) {
           return;
       }
       try {
-          $className = SchoolClass::on($article->connection)->find($article->grade_level)->grade_name;
-          $title = "تم نشر مقال جديد: {$article->title} (الصف: {$className})";
-          $this->oneSignalService->sendNotification($title, $article->title);
+          $connection = method_exists($article, 'getConnectionName') ? $article->getConnectionName() : ($article->connection ?? 'jo');
+          $className = SchoolClass::on($connection)->find($article->grade_level)?->grade_name ?? '';
+          $title = "تم نشر مقال جديد: {$article->title}";
+          if ($className !== '') {
+              $title .= " (الصف: {$className})";
+          }
+          $countryCode = in_array($connection, ['jo', 'sa', 'eg', 'ps'], true) ? $connection : 'jo';
+          $this->fcmService->sendToAllUsers($title, $article->title, [
+              'type' => 'article',
+              'article_id' => $article->id,
+              'url' => "/{$countryCode}/lesson/articles/{$article->id}",
+          ]);
       } catch (\Exception $e) {
           Log::warning('Failed to send notification: ' . $e->getMessage());
           // Continue execution even if notification fails

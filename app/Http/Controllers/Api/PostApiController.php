@@ -17,6 +17,7 @@ use App\Models\Category;
 use App\Models\Keyword;
 use App\Models\User;
 use App\Notifications\PostNotification;
+use App\Services\FcmService;
 use App\Services\SecureFileUploadService;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -26,10 +27,12 @@ use App\Http\Resources\BaseResource;
 class PostApiController extends Controller
 {
     protected $uploadService;
+    protected FcmService $fcmService;
 
-    public function __construct(SecureFileUploadService $uploadService)
+    public function __construct(SecureFileUploadService $uploadService, FcmService $fcmService)
     {
         $this->uploadService = $uploadService;
+        $this->fcmService = $fcmService;
     }
 
     /** ------------------------------
@@ -288,6 +291,8 @@ class PostApiController extends Controller
                         $user->notify(new PostNotification($post));
                     }
                 });
+
+                $this->sendPushNotification($post, $db);
             } catch (\Exception $e) {
                 Log::error("Failed to send post notifications: " . $e->getMessage());
                 // Don't fail the request just because notifications failed
@@ -510,6 +515,22 @@ class PostApiController extends Controller
         }
 
         Cache::forever($key, 2);
+    }
+
+    protected function sendPushNotification(Post $post, string $countryCode): void
+    {
+        if (!$this->fcmService->isEnabled()) {
+            return;
+        }
+
+        $countryCode = in_array($countryCode, ['jo', 'sa', 'eg', 'ps'], true) ? $countryCode : 'jo';
+        $title = "تم نشر منشور جديد: {$post->title}";
+
+        $this->fcmService->sendToAllUsers($title, $post->title, [
+            'type' => 'post',
+            'post_id' => $post->id,
+            'url' => "/{$countryCode}/posts/{$post->id}",
+        ]);
     }
 
     /**

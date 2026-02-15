@@ -4,61 +4,47 @@ namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
-use Illuminate\Notifications\Messages\MailMessage;
-use App\Services\OneSignalService;
 
 class ArticleNotification extends Notification
 {
     use Queueable;
 
     public $article;
-    protected $oneSignalService;
 
     public function __construct($article)
     {
         $this->article = $article;
-        $this->oneSignalService = new OneSignalService();
     }
 
     public function via($notifiable)
     {
-        // Respect global OneSignal toggle
-        if (!config('onesignal.enabled')) {
-            return ['database'];
-        }
-        return ['database', 'onesignal'];
-    }
-
-    public function toOneSignal($notifiable)
-    {
-        $country = session('country', 'jordan');
-        $url = route('dashboard.articles.show', ['article' => $this->article->id, 'country' => $country]);
-        
-        return $this->oneSignalService->sendNotification(
-            'New Article Published',
-            $this->article->title,
-            $url,
-            [
-                'article_id' => $this->article->id,
-                'type' => 'article'
-            ]
-        );
+        // Keep per-user inbox notifications in database.
+        // Push is sent once from the controller to avoid duplicates.
+        return ['database'];
     }
 
     public function toArray($notifiable)
     {
-        $country = session('country', 'jordan');
-        // Direct link to public interface
-        $url = '/jo/lesson/articles/' . $this->article->id;
-        
+        $countryCode = $this->resolveCountryCode();
+        $url = "/{$countryCode}/lesson/articles/{$this->article->id}";
+
         return [
             'title' => 'مقال جديد: ' . $this->article->title,
-            'message' => 'تم نشر مقال جديد في ' . ($this->article->schoolClass->name ?? 'المدرسة'),
+            'message' => 'تم نشر مقال جديد.',
             'article_id' => $this->article->id,
-            'type' => 'Article',
+            'type' => 'article',
             'url' => $url,
             'action_url' => $url,
         ];
+    }
+
+    private function resolveCountryCode(): string
+    {
+        $connection = method_exists($this->article, 'getConnectionName')
+            ? $this->article->getConnectionName()
+            : null;
+
+        return in_array($connection, ['jo', 'sa', 'eg', 'ps'], true) ? $connection : 'jo';
     }
 }
 

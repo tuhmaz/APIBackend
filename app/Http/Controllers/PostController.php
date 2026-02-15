@@ -17,6 +17,8 @@ use App\Models\Category;
 use App\Models\Keyword;
 use App\Models\File;
 use App\Jobs\GenerateSitemapJob;
+use App\Notifications\PostNotification;
+use App\Services\FcmService;
 
 
 class PostController extends NewsController
@@ -32,13 +34,15 @@ class PostController extends NewsController
  * خدمة التحميل الآمن للملفات
  */
 protected $secureFileUploadService;
+protected FcmService $fcmService;
 
 /**
  * إنشاء مثيل جديد من وحدة التحكم.
  */
-public function __construct(SecureFileUploadService $secureFileUploadService)
+public function __construct(SecureFileUploadService $secureFileUploadService, FcmService $fcmService)
 {
     $this->secureFileUploadService = $secureFileUploadService;
+    $this->fcmService = $fcmService;
     $this->middleware('auth');
 }
 
@@ -282,6 +286,8 @@ try {
         DB::connection($connection)->commit();
         Log::info('Post created successfully', ['post_id' => $post->id]);
 
+        $this->dispatchPostNotifications($post, $connection);
+
         // توليد خريطة الموقع تلقائياً
         GenerateSitemapJob::dispatch($connection, 'posts');
 
@@ -297,15 +303,50 @@ try {
         throw $e;
     }
 
-} catch (\Exception $e) {
-    Log::error('Error creating post: ' . $e->getMessage());
-    return back()->withInput()->with('error', __('Error creating post: ') . $e->getMessage());
-}
-}
+	} catch (\Exception $e) {
+	    Log::error('Error creating post: ' . $e->getMessage());
+	    return back()->withInput()->with('error', __('Error creating post: ') . $e->getMessage());
+	}
+	}
+
+    protected function dispatchPostNotifications(Post $post, string $countryCode): void
+    {
+        try {
+            User::select('id')->chunk(200, function ($users) use ($post) {
+                foreach ($users as $user) {
+                    $user->notify(new PostNotification($post));
+                }
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Failed to store post database notifications', [
+                'post_id' => $post->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        if (!$this->fcmService->isEnabled()) {
+            return;
+        }
+
+        try {
+            $resolvedCountry = in_array($countryCode, ['jo', 'sa', 'eg', 'ps'], true) ? $countryCode : 'jo';
+            $title = "تم نشر منشور جديد: {$post->title}";
+            $this->fcmService->sendToAllUsers($title, $post->title, [
+                'type' => 'post',
+                'post_id' => $post->id,
+                'url' => "/{$resolvedCountry}/posts/{$post->id}",
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send post push notifications', [
+                'post_id' => $post->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 
 
-public function edit($id, Request $request)
-{
+	public function edit($id, Request $request)
+	{
     try {
         $country = $request->input('country', '1');
         $connection = $this->getConnection($country);

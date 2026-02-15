@@ -2,25 +2,19 @@
 
 namespace App\Services;
 
-use Kreait\Firebase\Factory;
-
 class FirebaseService
 {
-    protected $messaging;
-
-    public function __construct()
+    public function __construct(private readonly FcmService $fcmService)
     {
-        $factory = (new Factory)->withServiceAccount(config('firebase.credentials.file'));
-        $this->messaging = $factory->createMessaging();
     }
 
-    public function sendNotification($title, $body, $token)
+    public function sendNotification($title, $body, $token, array $data = [])
     {
-        $message = [
-            'notification' => ['title' => $title, 'body' => $body],
-            'token' => $token,
-        ];
+        $token = is_string($token) ? trim($token) : '';
+        if ($token === '') {
+            return;
+        }
 
-        return $this->messaging->send($message);
+        $this->fcmService->sendToTokens([$token], (string) $title, (string) $body, $data);
     }
 }

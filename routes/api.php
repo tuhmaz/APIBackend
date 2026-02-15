@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\PerformanceApiController;
 use App\Http\Controllers\Api\PermissionApiController;
 use App\Http\Controllers\Api\PostApiController;
+use App\Http\Controllers\Api\PushTokenApiController;
 use App\Http\Controllers\Api\ReactionApiController;
 use App\Http\Controllers\Api\RedisApiController;
 use App\Http\Controllers\Api\RoleApiController;
@@ -100,6 +101,8 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
             Route::put('/profile', [AuthApiController::class, 'updateProfile']);
             Route::post('/logout', [AuthApiController::class, 'logout']);
             Route::post('/email/resend', [AuthApiController::class, 'resendVerifyEmail']);
+            Route::post('/push-token', [PushTokenApiController::class, 'store']);
+            Route::delete('/push-token', [PushTokenApiController::class, 'destroy']);
         });
     });
 
