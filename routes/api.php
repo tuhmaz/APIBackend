@@ -88,6 +88,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
         // Registration & Login
         Route::post('/register', [AuthApiController::class, 'register']);
         Route::post('/login', [AuthApiController::class, 'login']);
+        Route::post('/google/token', [AuthApiController::class, 'googleTokenLogin']);
 
         // Password Reset
         Route::post('/password/forgot', [AuthApiController::class, 'forgotPassword']);

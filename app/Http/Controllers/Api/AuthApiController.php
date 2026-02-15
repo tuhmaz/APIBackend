@@ -519,4 +519,66 @@ class AuthApiController extends Controller
                 ->setStatusCode(500);
         }
     }
+
+    /**
+     * Google Token Login (Native Mobile App)
+     * Accepts a Google access token from the mobile app and returns a Sanctum token.
+     */
+    public function googleTokenLogin(Request $request)
+    {
+        $request->validate([
+            'access_token' => 'required|string',
+        ]);
+
+        try {
+            $googleUser = Socialite::driver('google')
+                ->stateless()
+                ->userFromToken($request->input('access_token'));
+
+            if (!$googleUser->getEmail()) {
+                return (new BaseResource([
+                    'message' => 'لم يتم الحصول على البريد الإلكتروني من Google.',
+                ]))->response($request)->setStatusCode(422);
+            }
+
+            // Find or create user (same logic as googleCallback)
+            $user = User::where('email', $googleUser->getEmail())->first();
+
+            if (!$user) {
+                $user = User::create([
+                    'name'              => $googleUser->getName(),
+                    'email'             => $googleUser->getEmail(),
+                    'password'          => Hash::make(Str::random(24)),
+                    'google_id'         => $googleUser->getId(),
+                    'email_verified_at' => now(),
+                    'profile_photo_path' => $googleUser->getAvatar(),
+                ]);
+
+                $user->assignRole('User');
+            } else {
+                if (!$user->google_id) {
+                    $user->google_id = $googleUser->getId();
+                    $user->save();
+                }
+            }
+
+            $user->load(['roles:id,name', 'permissions:id,name']);
+            $token = $this->issueToken($user);
+
+            return new BaseResource([
+                'status'  => true,
+                'message' => 'تم تسجيل الدخول بنجاح.',
+                'token'   => $token,
+                'user'    => new UserResource($user),
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Google Token Login Failed: {$e->getMessage()}", [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return (new BaseResource([
+                'message' => 'فشل تسجيل الدخول باستخدام Google.',
+            ]))->response($request)->setStatusCode(401);
+        }
+    }
 }
