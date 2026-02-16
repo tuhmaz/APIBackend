@@ -521,6 +521,58 @@ class AuthApiController extends Controller
     }
 
     /**
+     * ============================
+     *  DELETE ACCOUNT
+     * ============================
+     */
+    public function deleteAccount(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        // Google-only accounts have no user-set password; skip check for them
+        $isGoogleOnly = $user->google_id && !Hash::check('', $user->password);
+
+        if (!$isGoogleOnly) {
+            $request->validate([
+                'password' => 'required|string',
+            ], [
+                'password.required' => 'كلمة المرور مطلوبة.',
+            ]);
+
+            if (!Hash::check($request->password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'password' => ['كلمة المرور غير صحيحة.'],
+                ]);
+            }
+        }
+
+        // Delete profile photo
+        if ($user->profile_photo_path) {
+            Storage::disk('public')->delete($user->profile_photo_path);
+        }
+
+        // Revoke all tokens
+        $user->tokens()->delete();
+
+        // Detach roles and permissions
+        if (method_exists($user, 'roles')) {
+            $user->roles()->detach();
+        }
+        if (method_exists($user, 'permissions')) {
+            $user->permissions()->detach();
+        }
+
+        // Delete user
+        $user->delete();
+
+        return new BaseResource([
+            'status'  => true,
+            'message' => 'تم حذف الحساب بنجاح.',
+        ]);
+    }
+
+    /**
      * Google Token Login (Native Mobile App)
      * Accepts a Google access token from the mobile app and returns a Sanctum token.
      */

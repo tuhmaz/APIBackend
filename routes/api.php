@@ -103,6 +103,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
             Route::post('/email/resend', [AuthApiController::class, 'resendVerifyEmail']);
             Route::post('/push-token', [PushTokenApiController::class, 'store']);
             Route::delete('/push-token', [PushTokenApiController::class, 'destroy']);
+            Route::post('/account/delete', [AuthApiController::class, 'deleteAccount']);
         });
     });
 

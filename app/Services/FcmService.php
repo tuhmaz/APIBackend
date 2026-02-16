@@ -18,6 +18,9 @@ class FcmService
     public function sendToAllUsers(string $title, string $body, array $data = []): void
     {
         $tokens = PushToken::query()->pluck('token')->all();
+        if (empty($tokens)) {
+            Log::warning('FCM send skipped: no registered push tokens found.');
+        }
         $this->sendToTokens($tokens, $title, $body, $data);
     }
 
