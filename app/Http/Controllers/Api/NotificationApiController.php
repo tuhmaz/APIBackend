@@ -276,49 +276,44 @@ class NotificationApiController extends Controller
             'action_url' => 'nullable|string|max:500',
         ]);
 
-        // Send to all Admin and Supervisor users (dashboard members)
-        $recipients = User::role(['Admin', 'Supervisor'])
-            ->select('id')
-            ->get();
-
-        if ($recipients->isEmpty()) {
-            return new BaseResource([
-                'success' => true,
-                'message' => 'No recipients found',
-                'sent_to' => 0,
-            ]);
-        }
-
-        $now  = now();
-        $data = json_encode([
+        $now       = now();
+        $data      = json_encode([
             'title'      => $validated['title'],
             'message'    => $validated['message'],
             'action_url' => $validated['action_url'] ?? null,
         ]);
+        $totalSent = 0;
 
-        // Build bulk insert rows — one notification per admin/supervisor
-        $rows = $recipients->map(fn($user) => [
-            'id'              => Str::uuid()->toString(),
-            'type'            => $validated['type'],
-            'notifiable_type' => 'App\\Models\\User',
-            'notifiable_id'   => $user->id,
-            'data'            => $data,
-            'read_at'         => null,
-            'created_at'      => $now,
-            'updated_at'      => $now,
-        ])->all();
+        // Broadcast to ALL users who have any role (includes User, Supervisor, Admin)
+        // Chunked in batches of 500 to handle large user bases without timeout
+        User::whereHas('roles', function ($q) {
+            $q->where('guard_name', 'sanctum');
+        })
+        ->select('id')
+        ->chunk(500, function ($users) use ($now, $data, $validated, &$totalSent) {
+            $rows = $users->map(fn($u) => [
+                'id'              => Str::uuid()->toString(),
+                'type'            => $validated['type'],
+                'notifiable_type' => 'App\\Models\\User',
+                'notifiable_id'   => $u->id,
+                'data'            => $data,
+                'read_at'         => null,
+                'created_at'      => $now,
+                'updated_at'      => $now,
+            ])->all();
 
-        DB::table('notifications')->insert($rows);
+            DB::table('notifications')->insert($rows);
+            $totalSent += count($rows);
+        });
 
-        // Clear notification cache for each recipient
-        foreach ($recipients as $user) {
-            $this->clearNotificationCache($user);
-        }
+        // Clear cache only for current user so they see it immediately in the bell
+        // Other users will see it on the next 30-second poll (cache expires naturally)
+        $this->clearNotificationCache($currentUser);
 
         return new BaseResource([
             'success' => true,
-            'message' => 'Notification sent successfully',
-            'sent_to' => count($rows),
+            'message' => 'Notification broadcast successfully',
+            'sent_to' => $totalSent,
         ]);
     }
 

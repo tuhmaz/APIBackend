@@ -47,8 +47,8 @@ Artisan::command('migrations:fix-schema', function () {
 })->purpose('Fix migrations table schema (add AUTO_INCREMENT to id)');
 
 // Notifications pruning schedule
-// Daily prune: remove ALL notifications (read and unread) older than 3 days
-Schedule::command('notifications:prune --days=3')->dailyAt('02:30')->withoutOverlapping();
+// Prune read notifications older than 1 day, unread older than 7 days
+Schedule::command('notifications:prune --days=1')->dailyAt('02:30')->withoutOverlapping();
 
 // Activity log cleanup: keep only last 7 days (all databases)
 Schedule::command('activitylog:prune-all --days=7')->dailyAt('03:00')->withoutOverlapping();
