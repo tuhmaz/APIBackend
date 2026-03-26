@@ -253,6 +253,45 @@ class NotificationApiController extends Controller
     }
 
     /**
+     * Store a new notification for the current user.
+     * Called from the frontend after article/post creation or update.
+     */
+    public function store(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return (new BaseResource(['message' => 'Unauthenticated']))
+                ->response($request)
+                ->setStatusCode(401);
+        }
+
+        $validated = $request->validate([
+            'type'       => 'required|string|max:100',
+            'title'      => 'required|string|max:255',
+            'message'    => 'required|string|max:500',
+            'action_url' => 'nullable|string|max:500',
+        ]);
+
+        $user->notifications()->create([
+            'id'   => \Illuminate\Support\Str::uuid()->toString(),
+            'type' => $validated['type'],
+            'data' => [
+                'title'      => $validated['title'],
+                'message'    => $validated['message'],
+                'action_url' => $validated['action_url'] ?? null,
+            ],
+            'read_at' => null,
+        ]);
+
+        $this->clearNotificationCache($user);
+
+        return new BaseResource([
+            'success' => true,
+            'message' => 'Notification created successfully',
+        ]);
+    }
+
+    /**
      * Prune old notifications from all databases
      * Requires 'manage settings' permission
      */

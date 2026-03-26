@@ -383,6 +383,7 @@ Route::middleware([FrontendApiGuard::class])->group(function () {
         // Notifications
         Route::prefix('notifications')->group(function () {
             Route::get('/', [NotificationApiController::class, 'index']);
+            Route::post('/', [NotificationApiController::class, 'store']);
             Route::get('/latest', [NotificationApiController::class, 'latest']);
             Route::post('/{id}/read', [NotificationApiController::class, 'markAsRead']);
             Route::post('/read-all', [NotificationApiController::class, 'markAllAsRead']);
