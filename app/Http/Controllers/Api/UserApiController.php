@@ -57,6 +57,23 @@ class UserApiController extends Controller
             );
         }
 
+        $allowedStatuses = ['active', 'inactive', 'pending', 'banned'];
+        if ($request->filled('status') && in_array($request->status, $allowedStatuses)) {
+            if ($request->status === 'pending') {
+                // Match frontend getStatus(): status='pending' OR (status is empty AND email not verified)
+                $query->where(function ($q) {
+                    $q->where('status', 'pending')
+                      ->orWhere(function ($inner) {
+                          $inner->where(function ($s) {
+                              $s->whereNull('status')->orWhere('status', '');
+                          })->whereNull('email_verified_at');
+                      });
+                });
+            } else {
+                $query->where('status', $request->status);
+            }
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
