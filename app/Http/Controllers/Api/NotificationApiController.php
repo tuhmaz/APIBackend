@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Notification\NotificationBulkActionRequest;
+use App\Http\Resources\Api\NotificationResource;
+use App\Http\Resources\BaseResource;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use App\Http\Resources\Api\NotificationResource;
-use App\Http\Resources\BaseResource;
-use App\Http\Requests\Notification\NotificationBulkActionRequest;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class NotificationApiController extends Controller
 {
@@ -253,13 +256,14 @@ class NotificationApiController extends Controller
     }
 
     /**
-     * Store a new notification for the current user.
+     * Broadcast a new notification to all Admin and Supervisor users.
      * Called from the frontend after article/post creation or update.
+     * Uses a single bulk INSERT for efficiency.
      */
     public function store(Request $request)
     {
-        $user = $request->user();
-        if (!$user) {
+        $currentUser = $request->user();
+        if (!$currentUser) {
             return (new BaseResource(['message' => 'Unauthenticated']))
                 ->response($request)
                 ->setStatusCode(401);
@@ -272,22 +276,49 @@ class NotificationApiController extends Controller
             'action_url' => 'nullable|string|max:500',
         ]);
 
-        $user->notifications()->create([
-            'id'   => \Illuminate\Support\Str::uuid()->toString(),
-            'type' => $validated['type'],
-            'data' => [
-                'title'      => $validated['title'],
-                'message'    => $validated['message'],
-                'action_url' => $validated['action_url'] ?? null,
-            ],
-            'read_at' => null,
+        // Send to all Admin and Supervisor users (dashboard members)
+        $recipients = User::role(['Admin', 'Supervisor'])
+            ->select('id')
+            ->get();
+
+        if ($recipients->isEmpty()) {
+            return new BaseResource([
+                'success' => true,
+                'message' => 'No recipients found',
+                'sent_to' => 0,
+            ]);
+        }
+
+        $now  = now();
+        $data = json_encode([
+            'title'      => $validated['title'],
+            'message'    => $validated['message'],
+            'action_url' => $validated['action_url'] ?? null,
         ]);
 
-        $this->clearNotificationCache($user);
+        // Build bulk insert rows — one notification per admin/supervisor
+        $rows = $recipients->map(fn($user) => [
+            'id'              => Str::uuid()->toString(),
+            'type'            => $validated['type'],
+            'notifiable_type' => 'App\\Models\\User',
+            'notifiable_id'   => $user->id,
+            'data'            => $data,
+            'read_at'         => null,
+            'created_at'      => $now,
+            'updated_at'      => $now,
+        ])->all();
+
+        DB::table('notifications')->insert($rows);
+
+        // Clear notification cache for each recipient
+        foreach ($recipients as $user) {
+            $this->clearNotificationCache($user);
+        }
 
         return new BaseResource([
             'success' => true,
-            'message' => 'Notification created successfully',
+            'message' => 'Notification sent successfully',
+            'sent_to' => count($rows),
         ]);
     }
 
