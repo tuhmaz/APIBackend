@@ -57,6 +57,20 @@ class UserApiController extends Controller
             );
         }
 
+        // Filter by users whose last login IP is blocked
+        if ($request->status === 'ip_blocked') {
+            $blockedIps = \App\Models\SecurityLog::where('event_type', 'blocked_access')
+                ->where('is_resolved', false)
+                ->pluck('ip_address')
+                ->unique()
+                ->toArray();
+
+            $query->whereIn(
+                \Illuminate\Support\Facades\DB::raw('(SELECT ip_address FROM visitors_tracking WHERE user_id = users.id ORDER BY last_activity DESC LIMIT 1)'),
+                $blockedIps
+            );
+        }
+
         $allowedStatuses = ['active', 'inactive', 'pending', 'banned'];
         if ($request->filled('status') && in_array($request->status, $allowedStatuses)) {
             if ($request->status === 'pending') {

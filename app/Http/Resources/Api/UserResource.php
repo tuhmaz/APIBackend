@@ -42,11 +42,15 @@ class UserResource extends JsonResource
                     'guard_name' => $permission->guard_name
                 ];
             }),
-            'last_login_ip' => \Illuminate\Support\Facades\DB::table('visitors_tracking')
+            'last_login_ip' => ($lastIp = \Illuminate\Support\Facades\DB::table('visitors_tracking')
                 ->where('user_id', $this->id)
                 ->whereNotNull('ip_address')
                 ->orderByDesc('last_activity')
-                ->value('ip_address'),
+                ->value('ip_address')),
+            'ip_is_blocked' => $lastIp ? \App\Models\SecurityLog::where('ip_address', $lastIp)
+                ->where('event_type', 'blocked_access')
+                ->where('is_resolved', false)
+                ->exists() : false,
             'created_at' => $this->created_at,
         ];
     }

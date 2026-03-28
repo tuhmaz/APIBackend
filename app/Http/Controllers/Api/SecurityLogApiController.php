@@ -151,10 +151,15 @@ class SecurityLogApiController extends Controller
 
     public function blockedIps(Request $request)
     {
-        $logs = SecurityLog::where('event_type', 'blocked_access')
-            ->where('is_resolved', false)
-            ->latest()
-            ->paginate($request->per_page ?? 20);
+        $query = SecurityLog::with('user')
+            ->where('event_type', 'blocked_access')
+            ->where('is_resolved', false);
+
+        if ($request->filled('search')) {
+            $query->where('ip_address', 'like', '%' . $request->search . '%');
+        }
+
+        $logs = $query->latest()->paginate($request->per_page ?? 20);
 
         return SecurityLogResource::collection($logs);
     }
@@ -218,7 +223,7 @@ class SecurityLogApiController extends Controller
     {
         $request->validate([
             'ip_address' => 'required|ip',
-            'reason' => 'required|string'
+            'reason' => 'nullable|string'
         ]);
 
         SecurityLog::create([

@@ -13,6 +13,7 @@ class SecurityLogResource extends JsonResource
             'event_type'   => $this->event_type,
             'severity'     => $this->severity,
             'ip_address'   => $this->ip_address,
+            'description'  => $this->description,
             'route'        => $this->route,
             'user'         => new UserResource($this->whenLoaded('user')),
             'is_resolved'  => (bool) $this->is_resolved,
