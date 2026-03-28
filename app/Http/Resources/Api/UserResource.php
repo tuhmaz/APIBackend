@@ -42,7 +42,7 @@ class UserResource extends JsonResource
                     'guard_name' => $permission->guard_name
                 ];
             }),
-            'last_login_ip' => \Illuminate\Support\Facades\DB::table('sessions')
+            'last_login_ip' => \Illuminate\Support\Facades\DB::table('visitors_tracking')
                 ->where('user_id', $this->id)
                 ->whereNotNull('ip_address')
                 ->orderByDesc('last_activity')
