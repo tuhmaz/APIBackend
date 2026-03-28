@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api;
 
+use App\Models\SecurityLog;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class UserResource extends JsonResource
@@ -42,6 +43,10 @@ class UserResource extends JsonResource
                     'guard_name' => $permission->guard_name
                 ];
             }),
+            'last_login_ip' => SecurityLog::where('user_id', $this->id)
+                ->whereNotNull('ip_address')
+                ->orderByDesc('created_at')
+                ->value('ip_address'),
             'created_at' => $this->created_at,
         ];
     }
