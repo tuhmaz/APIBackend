@@ -36,6 +36,7 @@ class HomeApiController extends Controller
      * GET /api/home
      * الصفحة الرئيسية عبر API — تقويم + فئات + صفوف + أخبار
      * OPTIMIZED: Single query for all month events instead of 31 queries
+     * IMPROVED: Cache tags for better invalidation
      */
     public function index(Request $request)
     {
@@ -48,78 +49,11 @@ class HomeApiController extends Controller
 
         // Cache key for this request
         $cacheKey = "home_data_{$db}_{$currentYear}_{$currentMonth}";
+        $cacheTags = ["home_{$db}", "calendar_{$db}", "classes_{$db}", "categories_{$db}", "news_{$db}"];
 
-        // Try to get from cache (5 minutes)
-        $homeData = Cache::remember($cacheKey, 300, function () use ($db, $today, $currentMonth, $currentYear) {
-            // إعداد التقويم
-            $firstDay = Carbon::create($currentYear, $currentMonth, 1);
-            $daysInMonth = $firstDay->daysInMonth;
-
-            // OPTIMIZATION: Fetch ALL events for the month in ONE query
-            $monthStart = $firstDay->copy()->startOfMonth();
-            $monthEnd = $firstDay->copy()->endOfMonth();
-
-            $allEvents = Event::on($db)
-                ->whereBetween('event_date', [$monthStart, $monthEnd])
-                ->get()
-                ->groupBy(fn($e) => Carbon::parse($e->event_date)->format('Y-m-d'))
-                ->map(fn($events) => $events->map(fn($e) => [
-                    'id' => $e->id,
-                    'title' => $e->title,
-                    'description' => $e->description,
-                    'date' => $e->event_date,
-                ]));
-
-            $calendar = [];
-
-            // days of previous month
-            $prevMonth = $firstDay->copy()->subMonth();
-            $prevMonthDays = $prevMonth->daysInMonth;
-            $firstDayOfWeek = $firstDay->dayOfWeek;
-
-            for ($i = $firstDayOfWeek - 1; $i >= 0; $i--) {
-                $date = $prevMonth->format('Y-m-') . sprintf('%02d', $prevMonthDays - $i);
-                $calendar[$date] = [];
-            }
-
-            // current month days - use pre-fetched events
-            for ($day = 1; $day <= $daysInMonth; $day++) {
-                $date = $today->format('Y-m-') . sprintf('%02d', $day);
-                $calendar[$date] = $allEvents->get($date, collect())->toArray();
-            }
-
-            // next month days
-            $lastDayOfMonth = Carbon::create($currentYear, $currentMonth, $daysInMonth)->dayOfWeek;
-            $toAdd = 6 - $lastDayOfMonth;
-            $nextMonth = $firstDay->copy()->addMonth();
-
-            for ($i = 1; $i <= $toAdd; $i++) {
-                $date = $nextMonth->format('Y-m-') . sprintf('%02d', $i);
-                $calendar[$date] = [];
-            }
-
-            // جلب البيانات الأخرى with eager loading
-            $classes = SchoolClass::on($db)
-                ->with(['subjects', 'semesters']) // Eager load relationships
-                ->get();
-
-            $categories = Category::on($db)
-                ->with(['children', 'parent']) // Eager load relationships
-                ->orderBy('id')
-                ->get();
-
-            $news = News::on($db)
-                ->with('category')
-                ->latest()
-                ->limit(10) // Limit news for performance
-                ->get();
-
-            return [
-                'calendar' => $calendar,
-                'classes' => $classes,
-                'categories' => $categories,
-                'news' => $news,
-            ];
+        // Try to get from cache (5 minutes) with tags support
+        $homeData = $this->getCacheWithTags($cacheKey, $cacheTags, 300, function () use ($db, $today, $currentMonth, $currentYear) {
+            return $this->buildHomeData($db, $today, $currentMonth, $currentYear);
         });
 
         return new BaseResource([
@@ -133,6 +67,127 @@ class HomeApiController extends Controller
             'icons' => $this->icons(),
             'user' => Auth::check() ? Auth::user() : null
         ]);
+    }
+
+    /**
+     * Build home data with optimized queries
+     */
+    private function buildHomeData(string $db, Carbon $today, int $currentMonth, int $currentYear): array
+    {
+        // إعداد التقويم
+        $firstDay = Carbon::create($currentYear, $currentMonth, 1);
+        $daysInMonth = $firstDay->daysInMonth;
+
+        // OPTIMIZATION: Fetch ALL events for the month in ONE query
+        $monthStart = $firstDay->copy()->startOfMonth();
+        $monthEnd = $firstDay->copy()->endOfMonth();
+
+        $allEvents = Event::on($db)
+            ->whereBetween('event_date', [$monthStart, $monthEnd])
+            ->get()
+            ->groupBy(fn($e) => Carbon::parse($e->event_date)->format('Y-m-d'))
+            ->map(fn($events) => $events->map(fn($e) => [
+                'id' => $e->id,
+                'title' => $e->title,
+                'description' => $e->description,
+                'date' => $e->event_date,
+            ]));
+
+        $calendar = [];
+
+        // days of previous month
+        $prevMonth = $firstDay->copy()->subMonth();
+        $prevMonthDays = $prevMonth->daysInMonth;
+        $firstDayOfWeek = $firstDay->dayOfWeek;
+
+        for ($i = $firstDayOfWeek - 1; $i >= 0; $i--) {
+            $date = $prevMonth->format('Y-m-') . sprintf('%02d', $prevMonthDays - $i);
+            $calendar[$date] = [];
+        }
+
+        // current month days - use pre-fetched events
+        for ($day = 1; $day <= $daysInMonth; $day++) {
+            $date = $today->format('Y-m-') . sprintf('%02d', $day);
+            $calendar[$date] = $allEvents->get($date, collect())->toArray();
+        }
+
+        // next month days
+        $lastDayOfMonth = Carbon::create($currentYear, $currentMonth, $daysInMonth)->dayOfWeek;
+        $toAdd = 6 - $lastDayOfMonth;
+        $nextMonth = $firstDay->copy()->addMonth();
+
+        for ($i = 1; $i <= $toAdd; $i++) {
+            $date = $nextMonth->format('Y-m-') . sprintf('%02d', $i);
+            $calendar[$date] = [];
+        }
+
+        // جلب البيانات الأخرى with eager loading
+        $classes = SchoolClass::on($db)
+            ->with(['subjects', 'semesters'])
+            ->get();
+
+        $categories = Category::on($db)
+            ->with(['children', 'parent'])
+            ->orderBy('id')
+            ->get();
+
+        $news = News::on($db)
+            ->with('category')
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        return [
+            'calendar' => $calendar,
+            'classes' => $classes,
+            'categories' => $categories,
+            'news' => $news,
+        ];
+    }
+
+    /**
+     * Get cache with tags support (Redis/Memcached) or fallback
+     */
+    private function getCacheWithTags(string $key, array $tags, int $ttl, callable $callback): mixed
+    {
+        if (method_exists(Cache::getStore(), 'tags')) {
+            try {
+                return Cache::tags($tags)->remember($key, $ttl, $callback);
+            } catch (\Exception $e) {
+                Log::warning('Cache tags not supported, falling back to regular cache: ' . $e->getMessage());
+            }
+        }
+
+        return Cache::remember($key, $ttl, $callback);
+    }
+
+    /**
+     * Clear all home-related cache for a database
+     */
+    public function clearHomeCache(Request $request): array
+    {
+        $db = $this->getDatabase($request);
+        $cacheKeys = [
+            "home_data_{$db}_*",
+        ];
+
+        // Clear calendar events cache
+        $year = now()->year;
+        $month = now()->month;
+        Cache::forget("calendar_events_{$db}_{$year}_{$month}");
+
+        // Use cache tags if available
+        if (method_exists(Cache::getStore(), 'tags')) {
+            Cache::tags(["home_{$db}", "calendar_{$db}", "classes_{$db}", "categories_{$db}", "news_{$db}"])->flush();
+        }
+
+        Log::info("Home cache cleared for database: {$db}");
+
+        return [
+            'success' => true,
+            'message' => 'Cache cleared successfully',
+            'database' => $db
+        ];
     }
 
     /**

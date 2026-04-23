@@ -154,6 +154,7 @@ class SitemapApiController extends Controller
         // استخدام chunk لتجنب استهلاك الذاكرة
         Article::on($connection)
             ->select(['id', 'title', 'updated_at'])
+            ->where('status', true)
             ->chunk(500, function ($articles) use ($sitemap, $db, &$count, $frontendBaseUrl, $defaultImage) {
                 foreach ($articles as $article) {
                     $frontendUrl = $frontendBaseUrl . '/' . $db . '/lesson/articles/' . $article->id;
@@ -194,6 +195,7 @@ class SitemapApiController extends Controller
         // استخدام chunk لتجنب استهلاك الذاكرة
         Post::on($connection)
             ->select(['id', 'title', 'image', 'updated_at'])
+            ->where('is_active', true)
             ->chunk(500, function ($posts) use ($sitemap, $db, &$count, $frontendBaseUrl, $appUrl, $defaultImage) {
                 foreach ($posts as $post) {
                     $frontendUrl = $frontendBaseUrl . '/' . $db . '/posts/' . $post->id;
