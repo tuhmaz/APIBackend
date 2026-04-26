@@ -22,15 +22,48 @@ class VisitorTrackingMiddleware
         $this->visitorService = $visitorService;
     }
 
+    /**
+     * Parse the CookieYes consent cookie and return true if the given
+     * category (e.g. "analytics") has been accepted.
+     *
+     * CookieYes stores consent as a URL-encoded string like:
+     *   consentid:XXX,consent:yes,action:yes,necessary:yes,analytics:yes,...
+     */
+    private function hasCookieYesConsent(Request $request, string $category): bool
+    {
+        $raw = $request->cookie('cookieyes-consent');
+        if (!$raw) {
+            // No consent cookie yet — first visit, do not set tracking cookies.
+            return false;
+        }
+
+        // URL-decode then split on commas
+        $decoded = urldecode($raw);
+        foreach (explode(',', $decoded) as $pair) {
+            [$key, $value] = array_pad(explode(':', $pair, 2), 2, '');
+            if (trim($key) === $category && trim($value) === 'yes') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function handle(Request $request, Closure $next)
     {
         $response = $next($request);
 
+        // Only set the visitor_id cookie and run tracking when the user has
+        // explicitly accepted analytics cookies via CookieYes.
+        if (!$this->hasCookieYesConsent($request, 'analytics')) {
+            return $response;
+        }
+
         // Ensure a stable visitor ID cookie for anonymous traffic (not tied to IP)
         $visitorId = $request->cookie('visitor_id');
-        if (!$visitorId && !$request->hasSession()) {
+        if (!$visitorId) {
             $visitorId = 'vid_' . Str::uuid()->toString();
-            $minutes = (int) Config::get('session.lifetime', 30);
+            $minutes = 60 * 24 * 365; // 1 year, matches CookieYes duration display
             $cookie = cookie(
                 'visitor_id',
                 $visitorId,
@@ -60,7 +93,6 @@ class VisitorTrackingMiddleware
         }
 
         // Use terminating callback to ensure response is sent to user first
-        // detailed logic is inside track()
         app()->terminating(function () use ($request, $response) {
             $this->track($request, $response);
         });

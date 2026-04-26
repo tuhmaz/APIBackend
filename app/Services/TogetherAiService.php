@@ -9,7 +9,7 @@ class TogetherAiService
 {
     protected $apiKey;
     protected $baseUrl = 'https://api.together.xyz/v1';
-    protected $model = 'google/gemma-3n-E4B-it';
+    protected $model = 'google/gemma-4-31B-it';
 
     protected $fallbackModels = [
         'meta-llama/Llama-3-8b-chat-hf',
