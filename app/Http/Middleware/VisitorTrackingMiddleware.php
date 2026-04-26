@@ -53,17 +53,12 @@ class VisitorTrackingMiddleware
     {
         $response = $next($request);
 
-        // Only set the visitor_id cookie and run tracking when the user has
-        // explicitly accepted analytics cookies via CookieYes.
-        if (!$this->hasCookieYesConsent($request, 'analytics')) {
-            return $response;
-        }
-
-        // Ensure a stable visitor ID cookie for anonymous traffic (not tied to IP).
-        // Cookie name "_amc_vid" is site-specific to avoid false-positive matches
-        // against known third-party cookies (e.g. Pardot's "visitor_id") in CMP databases.
+        // ── Persistent cookie (requires analytics consent) ────────────────────
+        // Only SET a new _amc_vid cookie when the user has explicitly accepted
+        // analytics cookies via CookieYes. Reading an existing cookie (already
+        // set in a prior consented session) is always allowed.
         $visitorId = $request->cookie('_amc_vid');
-        if (!$visitorId) {
+        if (!$visitorId && $this->hasCookieYesConsent($request, 'analytics')) {
             $visitorId = 'vid_' . Str::uuid()->toString();
             $minutes = 60 * 24 * 365; // 1 year
             $cookie = cookie(
@@ -84,17 +79,18 @@ class VisitorTrackingMiddleware
             $request->attributes->set('visitor_id', $visitorId);
         }
 
-        // Fail fast if disabled
+        // ── Server-side tracking (always runs) ───────────────────────────────
+        // IP-based analytics run under legitimate interest: no cookie is set
+        // here, so consent is not required. This keeps the dashboard working
+        // for all visitors regardless of their cookie choice.
         if (!Config::get('monitoring.visitor_tracking_enabled', true)) {
             return $response;
         }
 
-        // Only track GET requests to reduce noise and load
         if (!$request->isMethod('GET')) {
             return $response;
         }
 
-        // Use terminating callback to ensure response is sent to user first
         app()->terminating(function () use ($request, $response) {
             $this->track($request, $response);
         });
@@ -232,9 +228,8 @@ class VisitorTrackingMiddleware
                 'page_url'   => substr($url, 0, 2048),
             ]);
 
-            // 8. Optional: Visitor Session Log (Debounced)
-            // Only if strictly needed, otherwise skip to save another DB write
-            // $this->logSession($request, $user, $ip);
+            // 8. Visitor Session Log — feeds the Monitor page live visitor view
+            $this->logSession($request, $user, $ip);
 
         } catch (\Throwable $e) {
             // Silently fail to never impact user
