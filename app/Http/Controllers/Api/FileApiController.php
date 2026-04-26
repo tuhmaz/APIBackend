@@ -214,7 +214,7 @@ class FileApiController extends Controller
             $viewerId = $request->session()->getId();
         }
         if (!$viewerId) {
-            $viewerId = $request->cookie('visitor_id') ?: $request->ip();
+            $viewerId = $request->cookie('_amc_vid') ?: $request->ip();
         }
 
         $viewerHash = sha1((string) $viewerId);

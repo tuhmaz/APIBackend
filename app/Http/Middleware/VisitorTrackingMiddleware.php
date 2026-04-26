@@ -59,13 +59,15 @@ class VisitorTrackingMiddleware
             return $response;
         }
 
-        // Ensure a stable visitor ID cookie for anonymous traffic (not tied to IP)
-        $visitorId = $request->cookie('visitor_id');
+        // Ensure a stable visitor ID cookie for anonymous traffic (not tied to IP).
+        // Cookie name "_amc_vid" is site-specific to avoid false-positive matches
+        // against known third-party cookies (e.g. Pardot's "visitor_id") in CMP databases.
+        $visitorId = $request->cookie('_amc_vid');
         if (!$visitorId) {
             $visitorId = 'vid_' . Str::uuid()->toString();
-            $minutes = 60 * 24 * 365; // 1 year, matches CookieYes duration display
+            $minutes = 60 * 24 * 365; // 1 year
             $cookie = cookie(
-                'visitor_id',
+                '_amc_vid',
                 $visitorId,
                 $minutes,
                 '/',

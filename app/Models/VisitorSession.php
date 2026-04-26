@@ -62,7 +62,7 @@ class VisitorSession extends Model
 
         $sessionId = $request->hasSession() ? $request->session()->getId() : null;
         if (!$sessionId) {
-            $sessionId = $request->attributes->get('visitor_id') ?: $request->cookie('visitor_id');
+            $sessionId = $request->attributes->get('visitor_id') ?: $request->cookie('_amc_vid');
         }
         if (!$sessionId) {
             $sessionId = 'vid_' . Str::uuid()->toString();
@@ -127,12 +127,13 @@ class VisitorSession extends Model
         
         try {
             // Try the primary service with HTTPS
+            /** @var \Illuminate\Http\Client\Response $response */
             $response = Http::timeout(3) // 3 second timeout
                 ->withHeaders([
                     'Accept' => 'application/json',
                 ])
                 ->get("https://ipapi.co/{$ip}/json/");
-                
+
             if ($response->successful() && $data = $response->json()) {
                 $locationData = [
                     'country' => $data['country_name'] ?? null,
@@ -149,9 +150,10 @@ class VisitorSession extends Model
                 ];
             } else {
                 // Fallback to ip-api.com if primary fails
+                /** @var \Illuminate\Http\Client\Response $response */
                 $response = Http::timeout(3)
                     ->get("http://ip-api.com/json/{$ip}?fields=status,message,country,countryCode,city,lat,lon,isp,org,as,mobile,proxy,hosting,query&lang=en");
-                
+
                 if ($response->successful() && $response->json('status') === 'success') {
                     $locationData = [
                         'country' => $response->json('country'),
