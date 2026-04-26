@@ -128,7 +128,16 @@ class AdSnippetSanitizer
     }
 
     /**
-     * Validate that the snippet is proper AdSense code
+     * Detect whether a snippet is AdSense-based or a generic third-party script.
+     */
+    private static function isAdSenseSnippet(string $snippet): bool
+    {
+        return stripos($snippet, 'adsbygoogle') !== false
+            || stripos($snippet, 'googlesyndication.com') !== false;
+    }
+
+    /**
+     * Validate that the snippet is proper AdSense code OR a generic ad script.
      *
      * @param string $snippet
      * @param string|null $expectedClient
@@ -136,39 +145,29 @@ class AdSnippetSanitizer
      */
     private static function validateAdSenseFormat(string $snippet, ?string $expectedClient): void
     {
-        // 1. Basic AdSense keyword check
-        // We relax this to allow either 'adsbygoogle' OR 'googlesyndication.com'
-        // Some snippets might be just the <script src="..."> part or just the <ins> part
-        if (stripos($snippet, 'adsbygoogle') === false && stripos($snippet, 'googlesyndication.com') === false) {
-             throw new Exception('Not a valid AdSense snippet: missing adsbygoogle or googlesyndication reference');
+        // Generic third-party script ads (e.g. hilltopads, funny-tooth, etc.)
+        // They only need to contain a <script> tag — no AdSense elements required.
+        if (!self::isAdSenseSnippet($snippet)) {
+            if (!preg_match('/<script\b/i', $snippet)) {
+                throw new Exception('Invalid ad snippet: must contain a <script> tag or AdSense code');
+            }
+            // Generic scripts pass format validation — security checks already done above.
+            return;
         }
 
-        // 2. Validate client ID format if provided and present in snippet
-        if ($expectedClient) {
-            // Only validate format if we actually have a client ID string to check
-             if (!empty($expectedClient) && !preg_match('/ca-pub-\d+/', $expectedClient)) {
-                // If the stored client ID itself is invalid, we log/warn but don't necessarily fail the snippet validation
-                // unless we want to enforce valid client IDs in settings.
-                // For now, let's just log it or allow it if it's potentially empty.
-                // throw new Exception('Invalid AdSense client ID format');
-            }
+        // ── AdSense path ─────────────────────────────────────────────────────
 
-            // Check if snippet contains the expected client ID
-            // ONLY if the snippet actually contains a data-ad-client attribute or ca-pub string
-            if (stripos($snippet, 'ca-pub-') !== false && stripos($snippet, $expectedClient) === false) {
-                 // Relaxed check: Only throw if the snippet explicitly has a DIFFERENT client ID
-                 // This allows snippets that don't hardcode the client ID (e.g. some auto ads or specialized units)
-                 // throw new Exception('Snippet does not contain the expected AdSense client ID');
-            }
+        // Validate client ID if present in snippet
+        if ($expectedClient && stripos($snippet, 'ca-pub-') !== false) {
+            // Only warn if a different client ID is hardcoded — not enforced
         }
 
-        // 3. Validate ins element if present
+        // Validate ins element if present
         if (stripos($snippet, '<ins') !== false) {
             self::validateInsElement($snippet);
         }
 
-        // 4. Slot snippets (google_ads_*) must include an <ins class="adsbygoogle"> element.
-        // This prevents saving script-only snippets that cannot render ad units in page slots.
+        // AdSense slot snippets should have an <ins class="adsbygoogle"> element
         if (!preg_match('/<ins[^>]*class=["\'][^"\']*adsbygoogle[^"\']*["\'][^>]*>/i', $snippet)) {
             throw new Exception('Invalid AdSense snippet: missing ins.adsbygoogle element');
         }
